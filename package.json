@@ -1,0 +1,16 @@
+{
+  "name": "quota-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @quota/web dev",
+    "build": "pnpm --filter @quota/web build",
+    "start": "pnpm --filter @quota/web start",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "rm -rf apps/web/.next packages/core/dist node_modules apps/*/node_modules packages/*/node_modules"
+  }
+}
