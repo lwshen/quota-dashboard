@@ -2,9 +2,9 @@
 
 # Quota Dashboard
 
-A web dashboard that shows AI providers' quota / usage. It reproduces the quota-fetching mechanism of [CodexBar](https://github.com/steipete/CodexBar) — normalizing each provider's different usage API into a unified `RateWindow` / `UsageSnapshot` model that the frontend renders uniformly.
+A web dashboard that shows AI providers' quota / usage. It fetches each provider's usage server-side and normalizes their different usage APIs into a unified `RateWindow` / `UsageSnapshot` model that the frontend renders uniformly.
 
-> **Fully standalone subproject**: ships its own pnpm workspace and dependencies, with no coupling to the outer repository (the Swift CodexBar).
+> **Fully standalone subproject**: ships its own pnpm workspace and dependencies, with no coupling to the outer repository.
 
 ## Architecture
 
