@@ -1,76 +1,78 @@
+> **English** | [中文](./README.zh-CN.md)
+
 # Quota Dashboard
 
-在网页中展示 AI 服务商配额 / 用量的看板。复刻自 [CodexBar](https://github.com/steipete/CodexBar) 的配额获取机制 —— 把各家不同的用量接口归一化成统一的 `RateWindow` / `UsageSnapshot` 模型，由前端统一展示。
+A web dashboard that shows AI providers' quota / usage. It reproduces the quota-fetching mechanism of [CodexBar](https://github.com/steipete/CodexBar) — normalizing each provider's different usage API into a unified `RateWindow` / `UsageSnapshot` model that the frontend renders uniformly.
 
-> **完全独立的子项目**：自带 pnpm workspace 与依赖，与外层仓库（Swift 的 CodexBar）无任何耦合。
+> **Fully standalone subproject**: ships its own pnpm workspace and dependencies, with no coupling to the outer repository (the Swift CodexBar).
 
-## 架构
+## Architecture
 
 ```
-前端 (Next.js App Router, React)         ← 只消费归一化的 UsageSnapshot
+Frontend (Next.js App Router, React)         ← only consumes the normalized UsageSnapshot
         │ GET /api/usage  POST /api/credentials  POST /api/refresh
-后端代理 (Next route handlers, Node 运行时)
-        │ · 凭据加密存储 (AES-256-GCM + SQLite)
-        │ · 后台轮询 + OAuth token 刷新 (instrumentation 启动)
-        │ · 注入 Authorization/Cookie/自定义头，绕过浏览器 CORS 限制
-        ↓ 上游 HTTPS（服务端，无 CORS）
+Backend proxy (Next route handlers, Node runtime)
+        │ · Encrypted credential storage (AES-256-GCM + SQLite)
+        │ · Background polling + OAuth token refresh (started by instrumentation)
+        │ · Injects Authorization/Cookie/custom headers, bypassing the browser's CORS limits
+        ↓ Upstream HTTPS (server-side, no CORS)
 api.anthropic.com · chatgpt.com/backend-api · api.kimi.com · ...
 ```
 
-**为什么必须有后端**：浏览器受 CORS、httpOnly cookie 不可读、禁设 `Cookie`/`User-Agent` 头、拿不到本地凭据等限制，无法直接调这些用量端点。所有上游请求都在 Node 服务端发出。
+**Why a backend is required**: browsers are limited by CORS, cannot read httpOnly cookies, are forbidden from setting `Cookie`/`User-Agent` headers, cannot access local credentials, and so on — so they cannot call these usage endpoints directly. All upstream requests are made from the Node server.
 
-## 目录结构
+## Directory structure
 
 ```
 quota-dashboard/
-├─ packages/core/          # 与服务商无关的核心（可独立测试）
+├─ packages/core/          # Provider-agnostic core (independently testable)
 │  └─ src/
-│     ├─ model.ts          # RateWindow / UsageSnapshot 等统一模型
-│     ├─ adapter.ts        # ProviderFetchStrategy / runPipeline 管线
-│     ├─ decode.ts         # 容错解码 helper
-│     ├─ http.ts           # HttpClient 抽象 + Node fetch 实现
-│     ├─ registry.ts       # provider 注册表
+│     ├─ model.ts          # Unified models: RateWindow / UsageSnapshot, etc.
+│     ├─ adapter.ts        # ProviderFetchStrategy / runPipeline pipeline
+│     ├─ decode.ts         # Fault-tolerant decode helpers
+│     ├─ http.ts           # HttpClient abstraction + Node fetch implementation
+│     ├─ registry.ts       # Provider registry
 │     └─ providers/        # kimi / moonshot / claude / codex
-└─ apps/web/               # Next.js 看板 + 后端代理
-   ├─ app/                 # 页面 + API routes
-   ├─ components/          # ProviderCard / RateWindowBar / 表单
+└─ apps/web/               # Next.js dashboard + backend proxy
+   ├─ app/                 # Pages + API routes
+   ├─ components/          # ProviderCard / RateWindowBar / forms
    └─ lib/                 # db / crypto / store / fetcher / poller
 ```
 
-## 已实现的 provider
+## Implemented providers
 
-| Provider | 路径 | 凭据 | 产出 |
+| Provider | Path | Credentials | Output |
 |---|---|---|---|
-| **Kimi** | Code API (`api.kimi.com/coding/v1/usages`) | Bearer key | 周用量 + 5h 速率窗口 |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | 余额（无窗口） |
-| **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/模型/routines 窗口 + extra 花费 |
-| **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d 窗口 + credits |
+| **Kimi** | Code API (`api.kimi.com/coding/v1/usages`) | Bearer key | Weekly usage + 5h rate window |
+| **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | Balance (no window) |
+| **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/model/routines windows + extra spend |
+| **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d windows + credits |
 
-凭据获取方式见各 `providers/*.ts` 顶部注释。Claude/Codex 的 token 可从本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 复制粘贴。
+See the comment at the top of each `providers/*.ts` for how to obtain credentials. Claude/Codex tokens can be copy-pasted from your local `~/.claude/.credentials.json` and `~/.codex/auth.json`.
 
-## 本地运行
+## Local development
 
 ```bash
 cd quota-dashboard
 pnpm install
 
-# 配置环境变量
+# Configure environment variables
 cp apps/web/.env.example apps/web/.env
-# 生成加密主密钥并填入 APP_ENC_KEY
+# Generate the master encryption key and put it in APP_ENC_KEY
 openssl rand -hex 32
 
 pnpm dev          # http://localhost:3000
 ```
 
-打开页面 → 点「+ 配置凭据」→ 选 provider、粘贴 key/token → 保存即抓取。后台每 `POLL_INTERVAL_SECONDS` 秒自动刷新。
+Open the page → click "+ Add credentials" → pick a provider, paste the key/token → save and it fetches immediately. The background poller refreshes every `POLL_INTERVAL_SECONDS` seconds.
 
-## 构建 / 部署
+## Build / deploy
 
 ```bash
-pnpm build        # next build（standalone 输出）
-pnpm start        # 生产模式
+pnpm build        # next build (standalone output)
+pnpm start        # production mode
 
-# 或 Docker（常驻进程，支持后台轮询）
+# Or Docker (long-lived process, supports background polling)
 docker build -t quota-dashboard .
 docker run -p 3000:3000 \
   -e APP_ENC_KEY=$(openssl rand -hex 32) \
@@ -78,37 +80,37 @@ docker run -p 3000:3000 \
   quota-dashboard
 ```
 
-> 自托管请跑成**常驻进程**（standalone / Docker），不要用 serverless —— 后台轮询与 token 刷新依赖长生命周期进程。
+> When self-hosting, run it as a **long-lived process** (standalone / Docker); do not use serverless — background polling and token refresh depend on a long-lived process.
 
-## 安全说明
+## Security notes
 
-内置了一套面向公网的加固：
+A set of hardening measures aimed at public deployments is built in:
 
-- **鉴权（fail-closed）**：`middleware.ts` 拦截所有页面与 `/api/*`。需要 `DASHBOARD_PASSWORD` 登录，签发 HMAC 签名的 httpOnly session cookie。**未设置口令时一律拒绝访问**，避免裸奔上线。本地开发可设 `AUTH_DISABLED=true` 跳过。
-- **限流**：进程内按 IP 限流，登录路径更严（防暴破）。读 `x-forwarded-for`，因此务必放在反向代理之后。
-- **SSRF 防护**：用户提供的 Kimi `baseUrlOverride` 必须是公网 https，且会做字面量 + DNS 解析双重检查，拒绝私网 / 回环 / 云元数据地址。
-- **凭据保护**：AES-256-GCM 加密后存 SQLite，**绝不回传前端**；`/api/usage` 只暴露 UI 所需字段（剔除原始上游响应 `extra`）。
-- **CSRF**：session cookie 用 `sameSite=lax`，跨站发起的写请求不带 cookie，天然挡住。
+- **Authentication (fail-closed)**: `middleware.ts` intercepts all pages and `/api/*`. Login requires `DASHBOARD_PASSWORD` and issues an HMAC-signed httpOnly session cookie. **When no password is set, all access is denied**, preventing an unprotected deployment. For local development you can set `AUTH_DISABLED=true` to skip login.
+- **Rate limiting**: in-process per-IP rate limiting, stricter on the login path (anti-brute-force). It reads `x-forwarded-for`, so it must sit behind a reverse proxy.
+- **SSRF protection**: a user-supplied Kimi `baseUrlOverride` must be a public https URL and is checked twice (literal + DNS resolution), rejecting private / loopback / cloud-metadata addresses.
+- **Credential protection**: credentials are AES-256-GCM encrypted and stored in SQLite, and are **never returned to the frontend**; `/api/usage` exposes only the fields the UI needs (stripping the raw upstream response `extra`).
+- **CSRF**: the session cookie uses `sameSite=lax`, so cross-site write requests carry no cookie and are blocked by default.
 
-### 公网部署清单（务必全做）
+### Public deployment checklist (do all of these)
 
-1. **TLS**：本服务只发 HTTP，必须放在反向代理（Caddy / Nginx / Cloudflare）后面终止 HTTPS——否则登录与凭据表单是明文上线。
-2. 设置强 `DASHBOARD_PASSWORD` 与独立 `AUTH_SECRET`，保持 `AUTH_DISABLED` 关闭。
-3. 反向代理正确透传 `X-Forwarded-For`（限流依赖它），并由代理设置安全响应头（HSTS 等）。
-4. 仍建议叠加一层网络层防护（Cloudflare Access / IP 允许名单 / Tailscale），纵深防御。
+1. **TLS**: this service serves HTTP only and must sit behind a reverse proxy (Caddy / Nginx / Cloudflare) that terminates HTTPS — otherwise the login and credential forms go out in plaintext.
+2. Set a strong `DASHBOARD_PASSWORD` and a separate `AUTH_SECRET`, and keep `AUTH_DISABLED` off.
+3. Have the reverse proxy forward `X-Forwarded-For` correctly (rate limiting depends on it), and set security response headers (HSTS, etc.) at the proxy.
+4. Adding a network-layer defense (Cloudflare Access / IP allowlist / Tailscale) on top is still recommended, for defense in depth.
 
-> 残余风险：限流是单实例内存级（多实例需换 Redis）；SSRF 的 DNS 检查无法完全防 DNS-rebinding；主机被攻破则 `APP_ENC_KEY` 与库同在即等于明文。这些是非官方内部端点，字段可能漂移；对 claude.ai / chatgpt.com 的调用 ToS 敏感，请知悉风险。
+> Residual risks: rate limiting is single-instance in-memory (switch to Redis for multiple instances); the SSRF DNS check cannot fully prevent DNS rebinding; if the host is compromised, `APP_ENC_KEY` sitting alongside the database is effectively plaintext. These are unofficial internal endpoints whose fields may drift; calls to claude.ai / chatgpt.com are ToS-sensitive — be aware of the risks.
 
-## 扩展新 provider
+## Adding a new provider
 
-1. 在 `packages/core/src/providers/` 新增 `xxx.ts`，实现 `ProviderFetchStrategy` 并导出 `ProviderDescriptor`。
-2. 在 `providers/index.ts` 与 `registry.ts` 注册。
-3. 在 `model.ts` 的 `UsageProvider` 联合类型里加上它。
+1. Add `xxx.ts` under `packages/core/src/providers/`, implement `ProviderFetchStrategy`, and export a `ProviderDescriptor`.
+2. Register it in `providers/index.ts` and `registry.ts`.
+3. Add it to the `UsageProvider` union type in `model.ts`.
 
-UI 与后端无需改动 —— 表单字段、卡片展示都由 descriptor 元数据驱动。
+No UI or backend changes are needed — form fields and card rendering are driven by descriptor metadata.
 
-## 说明 / 取舍
+## Notes / trade-offs
 
-- 存储用 **better-sqlite3 直连 + 手写 SQL**（最少依赖、无迁移工具）；若需类型化查询 / 迁移可叠加 Drizzle。
-- 历史快照已落 `snapshot_history` 表（`store.ts` 的 `historyFor`），可据此加 used% 历史曲线。
-- cookie 抓取路径（claude.ai / chatgpt.com web、Kimi web）未包含在脚手架内 —— 见上游报告，属最脆弱、ToS 最敏感的一档，按需再加。
+- Storage uses **better-sqlite3 directly + hand-written SQL** (minimal dependencies, no migration tooling); if you need typed queries / migrations you can layer on Drizzle.
+- Historical snapshots are already persisted to the `snapshot_history` table (`historyFor` in `store.ts`), which you can use to add a used-% history chart.
+- The cookie-scraping paths (claude.ai / chatgpt.com web, Kimi web) are not included in this scaffold — see the upstream report; they are the most fragile and most ToS-sensitive tier, add them as needed.
