@@ -1,4 +1,4 @@
-// GET usage requires headers: Authorization: Bearer <access_token>, User-Agent: CodexBar, ChatGPT-Account-Id: <account_id>.
+// GET usage requires headers: Authorization: Bearer <access_token>, User-Agent, ChatGPT-Account-Id: <account_id>.
 // Window role keyed by windowMinutes: 300=session(primary), 10080=weekly(secondary).
 
 import type { FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
@@ -9,7 +9,8 @@ import { clampPercent, num, parseIsoOrUnix, retryAfterSeconds, safeJson } from "
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const USER_AGENT = "CodexBar";
+// Identify as the Codex CLI (its originator is codex_cli_rs); the endpoint doesn't validate the value.
+const USER_AGENT = "codex_cli_rs/0.142.4";
 
 interface WindowParsed {
   window: RateWindow;
