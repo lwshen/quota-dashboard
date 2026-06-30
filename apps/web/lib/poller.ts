@@ -7,7 +7,8 @@ let timer: ReturnType<typeof setInterval> | null = null;
 export function startPoller(): void {
   if (started || !ENV.enablePoller) return;
   started = true;
-  const ms = Math.max(15, ENV.pollInterval) * 1000;
+  // Floor at 60s (1 minute); the usage endpoints rate-limit faster polling.
+  const ms = Math.max(60, ENV.pollInterval) * 1000;
 
   fetchAllConfigured().catch((e) => console.error("[poller] initial fetch failed", e));
 
