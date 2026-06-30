@@ -10,6 +10,7 @@ export default function Home() {
   const [formProvider, setFormProvider] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   const loadUsage = useCallback(async () => {
     const res = await fetch("/api/usage", { cache: "no-store" });
@@ -18,6 +19,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    fetch("/api/session")
+      .then((r) => r.json())
+      .then((j) => setAuthed(Boolean(j.authed)))
+      .catch(() => {});
     fetch("/api/providers")
       .then((r) => r.json())
       .then((j) => setProviders(j.providers ?? []))
@@ -43,8 +48,13 @@ export default function Home() {
   }
 
   async function logout() {
-    await fetch("/api/logout", { method: "POST" });
-    window.location.href = "/login";
+    // Always land on /login even if the request errors, and replace history so the
+    // back button doesn't return to the authed view.
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } finally {
+      window.location.replace("/login");
+    }
   }
 
   return (
@@ -55,35 +65,46 @@ export default function Home() {
           <p className="text-xs text-neutral-500">AI 服务商配额 / 用量看板</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={refreshNow}
-            disabled={refreshing}
-            className="rounded bg-neutral-800 px-3 py-1.5 text-sm hover:bg-neutral-700 disabled:opacity-50"
-          >
-            {refreshing ? "刷新中…" : "刷新"}
-          </button>
-          <button
-            onClick={() => openForm()}
-            className="rounded bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500"
-          >
-            + 配置凭据
-          </button>
-          <button
-            onClick={logout}
-            className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100"
-          >
-            登出
-          </button>
+          {authed ? (
+            <>
+              <button
+                onClick={refreshNow}
+                disabled={refreshing}
+                className="rounded bg-neutral-800 px-3 py-1.5 text-sm hover:bg-neutral-700 disabled:opacity-50"
+              >
+                {refreshing ? "刷新中…" : "刷新"}
+              </button>
+              <button
+                onClick={() => openForm()}
+                className="rounded bg-emerald-600 px-3 py-1.5 text-sm hover:bg-emerald-500"
+              >
+                + 配置凭据
+              </button>
+              <button
+                onClick={logout}
+                className="rounded bg-neutral-800 px-3 py-1.5 text-sm text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100"
+              >
+                登出
+              </button>
+            </>
+          ) : (
+            <a
+              href="/login"
+              className="rounded bg-neutral-800 px-3 py-1.5 text-sm hover:bg-neutral-700"
+            >
+              登录
+            </a>
+          )}
         </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {views.map((v) => (
-          <ProviderCard key={v.provider} view={v} onConfigure={openForm} />
+          <ProviderCard key={v.provider} view={v} onConfigure={authed ? openForm : undefined} />
         ))}
       </div>
 
-      {showForm && (
+      {authed && showForm && (
         <AddCredentialForm
           providers={providers}
           initialProvider={formProvider ?? undefined}

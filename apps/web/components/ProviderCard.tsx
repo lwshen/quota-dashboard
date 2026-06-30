@@ -16,7 +16,7 @@ function laneTitle(provider: string, lane: "primary" | "secondary"): string {
   return lane === "primary" ? "主窗口" : "次窗口";
 }
 
-export function ProviderCard({ view, onConfigure }: { view: ProviderView; onConfigure: (provider: string) => void }) {
+export function ProviderCard({ view, onConfigure }: { view: ProviderView; onConfigure?: (provider: string) => void }) {
   const s = view.snapshot;
   const textOnly = s?.identity?.loginMethod && !s.primary && !s.secondary;
   return (
@@ -26,12 +26,14 @@ export function ProviderCard({ view, onConfigure }: { view: ProviderView; onConf
           <div className="font-medium">{view.label}</div>
           {s?.identity?.accountEmail && <div className="text-xs text-neutral-500">{s.identity.accountEmail}</div>}
         </div>
-        <button
-          onClick={() => onConfigure(view.provider)}
-          className="text-xs text-neutral-400 transition-colors hover:text-neutral-100"
-        >
-          配置
-        </button>
+        {onConfigure && (
+          <button
+            onClick={() => onConfigure(view.provider)}
+            className="text-xs text-neutral-400 transition-colors hover:text-neutral-100"
+          >
+            配置
+          </button>
+        )}
       </div>
 
       {view.error && <div className="text-xs text-red-400">⚠ {view.error}</div>}

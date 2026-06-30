@@ -14,7 +14,11 @@ function toBytes(s: string): Uint8Array<ArrayBuffer> {
 }
 
 async function hmacKey(): Promise<CryptoKey> {
-  const secret = ENV.authSecret || ENV.encKey || "insecure-dev-key";
+  // Fail-closed: never sign/verify sessions with a hardcoded fallback, or anyone
+  // could forge a valid cookie. A real deployment sets APP_ENC_KEY anyway (crypto.ts
+  // requires it), and AUTH_SECRET falls back to it.
+  const secret = ENV.authSecret || ENV.encKey;
+  if (!secret) throw new Error("AUTH_SECRET or APP_ENC_KEY must be set to sign sessions");
   return crypto.subtle.importKey("raw", toBytes(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
 }
 
@@ -51,5 +55,9 @@ export async function verifySessionToken(token: string | undefined): Promise<boo
   const sig = token.slice(dot + 1);
   const exp = Number(payload);
   if (!Number.isFinite(exp) || exp * 1000 < Date.now()) return false;
-  return timingSafeEqual(sig, await sign(payload));
+  try {
+    return timingSafeEqual(sig, await sign(payload));
+  } catch {
+    return false; // misconfigured secret → deny (fail-closed)
+  }
 }
