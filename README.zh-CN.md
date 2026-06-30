@@ -2,9 +2,9 @@
 
 # Quota Dashboard
 
-在网页中展示 AI 服务商配额 / 用量的看板。复刻自 [CodexBar](https://github.com/steipete/CodexBar) 的配额获取机制 —— 把各家不同的用量接口归一化成统一的 `RateWindow` / `UsageSnapshot` 模型，由前端统一展示。
+在网页中展示 AI 服务商配额 / 用量的看板。在服务端抓取各服务商的用量，把各家不同的用量接口归一化成统一的 `RateWindow` / `UsageSnapshot` 模型，由前端统一展示。
 
-> **完全独立的子项目**：自带 pnpm workspace 与依赖，与外层仓库（Swift 的 CodexBar）无任何耦合。
+> **完全独立的子项目**：自带 pnpm workspace 与依赖，与外层仓库无任何耦合。
 
 ## 架构
 
