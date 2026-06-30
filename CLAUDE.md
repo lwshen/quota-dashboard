@@ -46,6 +46,7 @@ UI and backend need no changes — credential form fields and card rendering are
 - `middleware.ts` gates **all** pages and `/api/*` (auth + per-IP rate limit) before anything else runs.
 - `POST /api/credentials` → validates fields per descriptor, SSRF-checks any `baseUrlOverride`, encrypts and stores the credential, then fetches once immediately.
 - `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`.
+- `lib/extCreds.ts` → credentials configured via `QUOTA_<PROVIDER>_*` env. Two paths: **inline** vars are seeded into the DB at startup (`seedCredentialsFromEnv`, called from `instrumentation.ts`) and then behave like UI-entered creds; a **file source** (`QUOTA_<P>_FILE`) is *live* — `fetchAndStore` re-reads it every poll, the file (not the DB) is the source of truth, and it takes precedence over everything. Read-only file sources never refresh/rotate (would invalidate the owner CLI's refresh token); only `QUOTA_<P>_FILE_WRITABLE=true` enables refresh + write-back. Native file shapes are parsed by the descriptor's `parseCredentialFile`/`serializeCredentialFile` (provider knowledge stays in core).
 - `lib/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
 - `GET /api/usage` → returns stored snapshots with UI-safe fields only (raw upstream `extra` is stripped).
 
@@ -61,6 +62,8 @@ UI and backend need no changes — credential form fields and card rendering are
 ## Environment variables
 
 Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (min 15), `ENABLE_POLLER`.
+
+Per-provider credential config (parsed in `lib/extCreds.ts`, not `env.ts`): `QUOTA_<PROVIDER>_BEARERTOKEN`/`_REFRESHTOKEN`/`_ACCOUNTID`/`_REGION`/`_BASEURLOVERRIDE`/`_EXPIRESAT`, `_JSON`, `_EXTRA_<KEY>`, `_MODE`, `_OVERWRITE` (inline → DB seed); `_FILE`, `_FILE_FORMAT` (`native`|`json`), `_FILE_WRITABLE` (live file source). `<PROVIDER>` = `CLAUDE`|`CODEX`|`KIMI`|`MOONSHOT`.
 
 ## Deployment
 

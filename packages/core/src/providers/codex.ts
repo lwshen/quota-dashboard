@@ -128,6 +128,36 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
   };
 }
 
+// ~/.codex/auth.json shape: { tokens: { access_token, refresh_token, account_id }, OPENAI_API_KEY }.
+function parseCredentialFile(raw: unknown): ProviderCredentials | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as Record<string, unknown>;
+  const tokens = (root.tokens && typeof root.tokens === "object" ? root.tokens : root) as Record<string, unknown>;
+  const access = typeof tokens.access_token === "string" ? tokens.access_token : null;
+  if (!access) return null;
+  const accountId =
+    typeof tokens.account_id === "string"
+      ? tokens.account_id
+      : typeof root.account_id === "string"
+        ? root.account_id
+        : undefined;
+  return {
+    bearerToken: access,
+    refreshToken: typeof tokens.refresh_token === "string" ? tokens.refresh_token : undefined,
+    accountId,
+  };
+}
+
+function serializeCredentialFile(creds: ProviderCredentials, prev: unknown): unknown {
+  const root = (prev && typeof prev === "object" ? { ...(prev as Record<string, unknown>) } : {}) as Record<string, unknown>;
+  const tokens = { ...((root.tokens && typeof root.tokens === "object" ? root.tokens : {}) as Record<string, unknown>) };
+  if (creds.bearerToken) tokens.access_token = creds.bearerToken;
+  if (creds.refreshToken) tokens.refresh_token = creds.refreshToken;
+  if (creds.accountId) tokens.account_id = creds.accountId;
+  root.tokens = tokens;
+  return root;
+}
+
 export const codexDescriptor: ProviderDescriptor = {
   provider: "codex",
   label: "Codex (ChatGPT 订阅)",
@@ -153,4 +183,6 @@ export const codexDescriptor: ProviderDescriptor = {
   ],
   resolveStrategies: () => [codexOAuthStrategy],
   refresh,
+  parseCredentialFile,
+  serializeCredentialFile,
 };

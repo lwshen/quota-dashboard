@@ -66,6 +66,39 @@ pnpm dev          # http://localhost:3000
 
 打开页面 → 点「+ 配置凭据」→ 选 provider、粘贴 key/token → 保存即抓取。后台每 `POLL_INTERVAL_SECONDS` 秒自动刷新。
 
+## 不用 UI 配置凭据
+
+除了网页表单，凭据也可以用环境变量提供，或直接读取本地 CLI 的凭据文件。`<PROVIDER>` 为 `CLAUDE` / `CODEX` / `KIMI` / `MOONSHOT` 之一，完整列表见 `apps/web/.env.example`。
+
+**A) 内联环境变量** —— 启动时一次性写入数据库，之后与 UI 里手填的凭据行为完全一致（token 刷新会持久化到数据库）。适合 `docker run -e`：
+
+```bash
+QUOTA_CLAUDE_BEARERTOKEN=sk-ant-oat...
+QUOTA_CLAUDE_REFRESHTOKEN=sk-ant-ort...     # 可选，启用自动刷新
+QUOTA_KIMI_BEARERTOKEN=sk-...
+QUOTA_CODEX_JSON={"bearerToken":"...","accountId":"...","refreshToken":"..."}
+```
+
+默认仅当数据库里还没有该 provider 的凭据时才写入（这样刷新进数据库的 token 不会被重启覆盖）。设 `QUOTA_<PROVIDER>_OVERWRITE=true` 可在每次重启时强制从环境变量重新写入。
+
+**B) 本地文件源** —— **每次轮询都重新读取**，以文件为准。直接指向 CLI 的实时凭据文件：
+
+```bash
+QUOTA_CLAUDE_FILE=/path/to/.claude/.credentials.json   # native 格式自动解析
+QUOTA_CODEX_FILE=/path/to/.codex/auth.json
+# QUOTA_<PROVIDER>_FILE_FORMAT=json      # 文件本身就是 ProviderCredentials JSON 时
+# QUOTA_<PROVIDER>_FILE_WRITABLE=true    # 允许看板刷新并回写文件
+```
+
+### 只读还是读写？
+
+**默认只读，并且只读是可行的。** 只读文件源下，看板每次轮询**只读取**文件，**绝不自己刷新 token**。这是有意为之：这些 refresh token 会轮换（用过一次旧的就失效），如果看板去刷新，就会悄悄把你本地 CLI 还在用的那个凭据文件搞失效。看板的做法是搭你 CLI 的便车 —— 由 CLI 保持 token 新鲜，看板每轮重读文件自然就跟上了。
+
+- **只读**（默认）：适合看板跑在「CLI 正常使用、会保持 token 新鲜」的机器上（或同机）。如果 CLI 闲置导致 access token 过期，卡片会显示「已过期，等待文件刷新」直到 CLI 把它刷新。看板永不写入。
+- **读写**（`QUOTA_<PROVIDER>_FILE_WRITABLE=true` + 可写挂载）：适合看板是**唯一**的刷新方 —— 比如跑在不会运行 CLI 的服务器上。此时看板会刷新 token 并把轮换后的新 token 回写到文件。不要把读写源指向某个同时被 CLI 刷新的文件，否则两边会互相把对方的 token 轮换失效。
+
+> Docker 提示：bind mount 要挂**目录**，不要挂单个文件。CLI 刷新 token 时是用「写临时文件 + 原子 rename」的方式替换文件，单文件挂载在容器内看不到这次更新；挂父目录才能让更新对容器可见。参见 `docker-compose.yml`。
+
 ## 构建 / 部署
 
 ```bash
@@ -78,7 +111,20 @@ docker run -p 3000:3000 \
   -e APP_ENC_KEY=$(openssl rand -hex 32) \
   -v $(pwd)/data:/app/apps/web/data \
   quota-dashboard
+
+# 直接读取本地 CLI 凭据（只读挂载「目录」）：
+docker run -p 3000:3000 \
+  -e APP_ENC_KEY=$(openssl rand -hex 32) \
+  -e DASHBOARD_PASSWORD=... \
+  -e QUOTA_CLAUDE_FILE=/creds/claude/.credentials.json \
+  -e QUOTA_CODEX_FILE=/creds/codex/auth.json \
+  -v $(pwd)/data:/app/apps/web/data \
+  -v "$HOME/.claude:/creds/claude:ro" \
+  -v "$HOME/.codex:/creds/codex:ro" \
+  quota-dashboard
 ```
+
+仓库根目录已附带一份带相同挂载的 `docker-compose.yml`。只读 / 读写的取舍见[不用 UI 配置凭据](#不用-ui-配置凭据)。
 
 > 自托管请跑成**常驻进程**（standalone / Docker），不要用 serverless —— 后台轮询与 token 刷新依赖长生命周期进程。
 
