@@ -1,34 +1,41 @@
 import type { RateWindow } from "@quota/core";
+import { barColor, extractFraction, formatCountdown } from "@/lib/format";
 
-function formatReset(resetsAt?: string | null): string {
-  if (!resetsAt) return "";
-  const diff = new Date(resetsAt).getTime() - Date.now();
-  if (Number.isNaN(diff)) return "";
-  if (diff <= 0) return "即将重置";
-  const totalMin = Math.floor(diff / 60_000);
-  const days = Math.floor(totalMin / 1440);
-  const hours = Math.floor((totalMin % 1440) / 60);
-  const mins = totalMin % 60;
-  if (days > 0) return `${days}天${hours}小时后重置`;
-  if (hours > 0) return `${hours}小时${mins}分后重置`;
-  return `${mins}分后重置`;
-}
-
-export function RateWindowBar({ title, window }: { title: string; window: RateWindow }) {
-  const used = Math.round(window.usedPercent);
-  const color = used >= 90 ? "bg-red-500" : used >= 70 ? "bg-amber-500" : "bg-emerald-500";
+export function RateWindowBar({
+  title,
+  sub,
+  window: w,
+  now,
+  indeterminate = false,
+}: {
+  title: string;
+  sub?: string | null;
+  window: RateWindow;
+  now: number;
+  /** Usage isn't trustworthy (e.g. limit unknown / usageKnown=false): show metadata, no fill. */
+  indeterminate?: boolean;
+}) {
+  const used = Math.round(w.usedPercent);
+  const frac = extractFraction(w.resetDescription);
   return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between text-xs text-neutral-400">
-        <span>{title}</span>
-        <span className="tabular-nums">
-          {used}%{window.resetDescription ? ` · ${window.resetDescription}` : ""}
+    <div className="meter">
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "baseline" }}>
+        <span className="mlbl">
+          {title}
+          {sub ? <small>{sub}</small> : null}
         </span>
+        <span className="mono mval">{indeterminate ? "未知 · unknown" : `${used}%${frac ? ` · ${frac}` : ""}`}</span>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-800">
-        <div className={`h-full ${color} transition-all`} style={{ width: `${Math.min(100, used)}%` }} />
-      </div>
-      {window.resetsAt && <div className="text-[11px] text-neutral-500">{formatReset(window.resetsAt)}</div>}
+      {indeterminate ? null : (
+        <div className="bar">
+          <i style={{ width: `${Math.min(100, Math.max(0, used))}%`, background: barColor(used) }} />
+        </div>
+      )}
+      {w.resetsAt ? (
+        <div className="reset">
+          重置 <b className="mono">{formatCountdown(w.resetsAt, now)}</b>
+        </div>
+      ) : null}
     </div>
   );
 }

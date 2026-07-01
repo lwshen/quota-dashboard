@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useOnEscape } from "@/lib/hooks";
 
 export interface CredentialFieldMeta {
   key: string;
@@ -33,6 +34,7 @@ export function AddCredentialForm({
   const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  useOnEscape(onClose);
 
   useEffect(() => {
     setFields({});
@@ -68,20 +70,19 @@ export function AddCredentialForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md space-y-4 rounded-xl border border-neutral-800 bg-neutral-900 p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-medium">配置凭据</h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-100">
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div className="modal-title">配置凭据 · Credentials</div>
+            <div className="modal-sub">凭据仅在服务端加密存储，不会返回前端</div>
+          </div>
+          <button type="button" className="modal-close" onClick={onClose}>
             ✕
           </button>
         </div>
 
-        <select
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
-          className="w-full rounded bg-neutral-800 p-2 text-sm"
-        >
+        <select className="field" value={provider} onChange={(e) => setProvider(e.target.value)}>
           {providers.map((p) => (
             <option key={p.provider} value={p.provider}>
               {p.label}
@@ -90,31 +91,30 @@ export function AddCredentialForm({
         </select>
 
         {meta?.credentialFields.map((f) => (
-          <div key={f.key} className="space-y-1">
-            <label className="text-xs text-neutral-400">
+          <div key={f.key}>
+            <label className="flabel">
               {f.label}
               {f.required && " *"}
             </label>
             <input
+              className="field"
               type={f.secret ? "password" : "text"}
               placeholder={f.placeholder}
               value={fields[f.key] ?? ""}
               autoComplete="off"
               onChange={(e) => setFields((s) => ({ ...s, [f.key]: e.target.value }))}
-              className="w-full rounded bg-neutral-800 p-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
             />
-            {f.help && <div className="text-[11px] text-neutral-600">{f.help}</div>}
+            {f.help ? <div className="fhelp">{f.help}</div> : null}
           </div>
         ))}
 
-        {msg && <div className="text-xs text-amber-400">{msg}</div>}
+        {msg ? <div className="formnote">{msg}</div> : null}
 
-        <button
-          disabled={busy}
-          onClick={submit}
-          className="w-full rounded bg-emerald-600 p-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {busy ? "保存中…" : "保存并抓取"}
+        <button type="button" className="btn-primary" disabled={busy} onClick={submit}>
+          {busy ? "保存中… · saving" : "保存并抓取 · Save & fetch"}
+        </button>
+        <button type="button" className="btn-ghost" onClick={onClose}>
+          取消 · Cancel
         </button>
       </div>
     </div>

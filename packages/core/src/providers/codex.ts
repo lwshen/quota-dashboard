@@ -132,6 +132,7 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
 export const codexDescriptor: ProviderDescriptor = {
   provider: "codex",
   label: "Codex (ChatGPT 订阅)",
+  accentColor: "#19c37d",
   producesRateWindows: true,
   credentialFields: [
     {

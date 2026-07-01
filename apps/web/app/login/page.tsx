@@ -34,26 +34,26 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-6">
-      <form onSubmit={submit} className="w-full max-w-xs space-y-4 rounded-xl border border-neutral-800 bg-neutral-900 p-6">
-        <h1 className="text-lg font-semibold">Quota Dashboard</h1>
+    <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <form onSubmit={submit} className="modal" style={{ maxWidth: 360 }}>
+        <div className="logodot" style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 15 }}>
+          ◇
+        </div>
+        <div className="modal-title">管理员登录 · Admin</div>
+        <div className="modal-sub">输入管理员密码以访问配额看板</div>
         <input
+          className="field"
           type="password"
           autoFocus
-          placeholder="访问口令"
+          placeholder="管理员密码 · Admin password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded bg-neutral-800 p-2 text-sm outline-none focus:ring-1 focus:ring-emerald-500"
         />
-        {err && <div className="text-xs text-red-400">{err}</div>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded bg-emerald-600 p-2 text-sm font-medium hover:bg-emerald-500 disabled:opacity-50"
-        >
-          {busy ? "登录中…" : "登录"}
+        {err ? <div className="formerr">⚠ {err}</div> : null}
+        <button type="submit" className="btn-primary" disabled={busy}>
+          {busy ? "登录中… · signing in" : "登录 · Sign in"}
         </button>
       </form>
-    </main>
+    </div>
   );
 }
