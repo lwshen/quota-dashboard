@@ -8,6 +8,9 @@ export interface ProviderView {
   snapshot: UsageSnapshot | null;
   error: string | null;
   fetchedAt: string | null;
+  /** Credential comes from a config file source (env QUOTA_<P>_FILE), not the DB. */
+  external?: boolean;
+  externalWritable?: boolean;
 }
 
 function laneTitle(provider: string, lane: "primary" | "secondary"): string {
@@ -26,13 +29,22 @@ export function ProviderCard({ view, onConfigure }: { view: ProviderView; onConf
           <div className="font-medium">{view.label}</div>
           {s?.identity?.accountEmail && <div className="text-xs text-neutral-500">{s.identity.accountEmail}</div>}
         </div>
-        {onConfigure && (
-          <button
-            onClick={() => onConfigure(view.provider)}
-            className="text-xs text-neutral-400 transition-colors hover:text-neutral-100"
+        {view.external ? (
+          <span
+            className="rounded bg-neutral-800 px-1.5 py-0.5 text-[11px] text-neutral-400"
+            title={`由环境变量配置文件管理（${view.externalWritable ? "可写" : "只读"}）`}
           >
-            配置
-          </button>
+            配置文件{view.externalWritable ? "" : " · 只读"}
+          </span>
+        ) : (
+          onConfigure && (
+            <button
+              onClick={() => onConfigure(view.provider)}
+              className="text-xs text-neutral-400 transition-colors hover:text-neutral-100"
+            >
+              配置
+            </button>
+          )
         )}
       </div>
 

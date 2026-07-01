@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import type { ProviderCredentials, SourceMode } from "@quota/core";
-import { getDescriptor, isProvider } from "@quota/core";
+import { ALL_PROVIDERS, getDescriptor, isProvider } from "@quota/core";
 import { deleteCredential, listCredentials, saveCredential } from "@/lib/store";
 import { fetchAndStore } from "@/lib/fetcher";
+import { fileSourceFor } from "@/lib/extCreds";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
 
 export const runtime = "nodejs";
@@ -10,15 +11,25 @@ export const dynamic = "force-dynamic";
 
 // Never return any secret.
 export async function GET() {
-  const credentials = listCredentials().map((c) => ({
-    provider: c.provider,
-    enabled: c.enabled,
-    mode: c.mode,
-    configuredKeys: Object.entries(c.credentials)
-      .filter(([, v]) => v != null && v !== "")
-      .map(([k]) => k),
-    updatedAt: c.updatedAt,
-  }));
+  // File-source providers are managed by config, not the DB; surface them as read-only entries
+  // and hide any leftover DB row (the file always wins at fetch time).
+  const fileProviders = new Set(ALL_PROVIDERS.filter((p) => fileSourceFor(p)));
+  const credentials: Array<Record<string, unknown>> = listCredentials()
+    .filter((c) => !fileProviders.has(c.provider))
+    .map((c) => ({
+      provider: c.provider,
+      enabled: c.enabled,
+      mode: c.mode,
+      source: "db",
+      configuredKeys: Object.entries(c.credentials)
+        .filter(([, v]) => v != null && v !== "")
+        .map(([k]) => k),
+      updatedAt: c.updatedAt,
+    }));
+  for (const p of fileProviders) {
+    const src = fileSourceFor(p)!;
+    credentials.push({ provider: p, enabled: true, mode: src.mode, source: "file", writable: src.writable });
+  }
   return NextResponse.json({ credentials });
 }
 

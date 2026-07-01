@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { listDescriptors } from "@quota/core";
 import { listSnapshots } from "@/lib/store";
+import { fileSourceFor } from "@/lib/extCreds";
 import { ENV } from "@/lib/env";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 
@@ -22,6 +23,9 @@ export async function GET() {
       // `identity` can carry account balance / email / org — admin-only.
       if (!authed) snapshot = { ...snapshot, identity: undefined };
     }
+    // A file source is managed by config (read fresh from disk); the UI shows a badge instead of
+    // the edit affordance. Only the booleans are exposed — never the path.
+    const fileSrc = fileSourceFor(d.provider);
     return {
       provider: d.provider,
       label: d.label,
@@ -29,6 +33,8 @@ export async function GET() {
       snapshot,
       error: s?.error ?? null,
       fetchedAt: s?.fetchedAt ?? null,
+      external: !!fileSrc,
+      externalWritable: !!fileSrc?.writable,
     };
   });
   return NextResponse.json({ providers });

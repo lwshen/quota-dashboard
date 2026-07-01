@@ -87,6 +87,17 @@ export interface ProviderDescriptor {
   producesRateWindows: boolean;
   resolveStrategies(mode: SourceMode): ProviderFetchStrategy[];
   refresh?(creds: ProviderCredentials, ctx: FetchContext): Promise<RefreshResult>;
+  /**
+   * Parse this provider's native on-disk credential file (already JSON-parsed) into
+   * ProviderCredentials, e.g. ~/.claude/.credentials.json. Returns null when the shape is
+   * unrecognized. Core stays free of fs access — the caller reads the file and passes `raw`.
+   */
+  parseCredentialFile?(raw: unknown): ProviderCredentials | null;
+  /**
+   * Merge refreshed credentials back into the native file shape for write-back. `prev` is the
+   * previously parsed raw file JSON; preserve unrelated fields and only touch the token fields.
+   */
+  serializeCredentialFile?(creds: ProviderCredentials, prev: unknown): unknown;
 }
 
 export async function runPipeline(

@@ -124,6 +124,37 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
   };
 }
 
+// ~/.claude/.credentials.json shape: { claudeAiOauth: { accessToken, refreshToken, expiresAt(ms epoch) } }.
+// Also tolerate a flat object without the wrapper.
+function parseCredentialFile(raw: unknown): ProviderCredentials | null {
+  if (!raw || typeof raw !== "object") return null;
+  const root = raw as Record<string, unknown>;
+  const wrapped = root.claudeAiOauth && typeof root.claudeAiOauth === "object";
+  const o = (wrapped ? root.claudeAiOauth : root) as Record<string, unknown>;
+  const accessToken = typeof o.accessToken === "string" ? o.accessToken : null;
+  if (!accessToken) return null;
+  const expiresMs = num(o.expiresAt);
+  return {
+    bearerToken: accessToken,
+    refreshToken: typeof o.refreshToken === "string" ? o.refreshToken : undefined,
+    expiresAt: expiresMs != null ? new Date(expiresMs).toISOString() : null,
+  };
+}
+
+function serializeCredentialFile(creds: ProviderCredentials, prev: unknown): unknown {
+  const root = (prev && typeof prev === "object" ? { ...(prev as Record<string, unknown>) } : {}) as Record<string, unknown>;
+  const wrapped = root.claudeAiOauth && typeof root.claudeAiOauth === "object";
+  const oauth = { ...((wrapped ? root.claudeAiOauth : root) as Record<string, unknown>) };
+  if (creds.bearerToken) oauth.accessToken = creds.bearerToken;
+  if (creds.refreshToken) oauth.refreshToken = creds.refreshToken;
+  if (creds.expiresAt) oauth.expiresAt = new Date(creds.expiresAt).getTime();
+  if (wrapped) {
+    root.claudeAiOauth = oauth;
+    return root;
+  }
+  return oauth;
+}
+
 export const claudeDescriptor: ProviderDescriptor = {
   provider: "claude",
   label: "Claude (OAuth 订阅)",
@@ -147,4 +178,6 @@ export const claudeDescriptor: ProviderDescriptor = {
   ],
   resolveStrategies: () => [claudeOAuthStrategy],
   refresh,
+  parseCredentialFile,
+  serializeCredentialFile,
 };

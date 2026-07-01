@@ -106,7 +106,7 @@ export default function Home() {
 
       {authed && showForm && (
         <AddCredentialForm
-          providers={providers}
+          providers={providers.filter((p) => !views.find((v) => v.provider === p.provider)?.external)}
           initialProvider={formProvider ?? undefined}
           onSaved={() => {
             setShowForm(false);

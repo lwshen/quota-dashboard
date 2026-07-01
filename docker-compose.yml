@@ -1,0 +1,32 @@
+# Example deployment that reads local CLI credentials directly.
+#
+# Mount the *directory* (not the single file) read-only: when the CLI refreshes its token it
+# rewrites the file via atomic rename, which a single-file bind mount would not see — a directory
+# mount does. QUOTA_*_FILE then points at the file inside the mounted directory.
+#
+# Read-only (:ro) is enough: the dashboard only reads, and relies on your local CLI to keep the
+# token fresh. If you instead want the dashboard to refresh tokens itself (e.g. the CLI never runs
+# here), drop ":ro", point the mount at a writable copy, and set QUOTA_<P>_FILE_WRITABLE=true.
+
+services:
+  quota-dashboard:
+    image: ghcr.io/OWNER/quota-dashboard:latest # or: build: .
+    ports:
+      - "3000:3000"
+    environment:
+      APP_ENC_KEY: "${APP_ENC_KEY}" # openssl rand -hex 32
+      DASHBOARD_PASSWORD: "${DASHBOARD_PASSWORD}"
+      # Read credentials straight from the mounted CLI config dirs:
+      QUOTA_CLAUDE_FILE: /creds/claude/.credentials.json
+      QUOTA_CODEX_FILE: /creds/codex/auth.json
+      # API-key providers can come straight from the environment:
+      # QUOTA_KIMI_BEARERTOKEN: "${KIMI_API_KEY}"
+      # QUOTA_MOONSHOT_BEARERTOKEN: "${MOONSHOT_API_KEY}"
+    volumes:
+      - quota-data:/app/apps/web/data # SQLite DB + history (must persist)
+      - ${HOME}/.claude:/creds/claude:ro # read-only: dashboard never writes
+      - ${HOME}/.codex:/creds/codex:ro
+    restart: unless-stopped
+
+volumes:
+  quota-data:
