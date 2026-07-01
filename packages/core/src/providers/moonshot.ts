@@ -1,13 +1,19 @@
 // GET https://api.moonshot.{ai|cn}/v1/users/me/balance — CN vs global host.
 // Success requires body code==0 && status==true (not just HTTP 200).
+// Currency follows the region (cn bills in RMB, else USD); the API returns raw
+// numbers with no currency field, so the symbol is derived, not read.
 
 import type { ProviderDescriptor, ProviderFetchStrategy } from "../adapter";
 import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
 import type { UsageSnapshot } from "../model";
 import { num, safeJson } from "../decode";
 
+function isCn(region?: string): boolean {
+  return region?.trim().toLowerCase() === "cn";
+}
+
 function host(region?: string): string {
-  return region?.trim().toLowerCase() === "cn" ? "https://api.moonshot.cn" : "https://api.moonshot.ai";
+  return isCn(region) ? "https://api.moonshot.cn" : "https://api.moonshot.ai";
 }
 
 const moonshotStrategy: ProviderFetchStrategy = {
@@ -29,10 +35,11 @@ const moonshotStrategy: ProviderFetchStrategy = {
       throw new UpstreamError(res.status, `moonshot error code=${j?.code} status=${j?.status}`);
     }
     const data = (j.data ?? {}) as Record<string, unknown>;
+    const sym = isCn(c.region) ? "¥" : "$";
     const available = num(data.available_balance) ?? 0;
     const cash = num(data.cash_balance) ?? 0;
-    let login = `Balance: $${available.toFixed(2)}`;
-    if (cash < 0) login += ` · $${Math.abs(cash).toFixed(2)} in deficit`;
+    let login = `Balance: ${sym}${available.toFixed(2)}`;
+    if (cash < 0) login += ` · ${sym}${Math.abs(cash).toFixed(2)} in deficit`;
 
     const snapshot: UsageSnapshot = {
       provider: "moonshot",
