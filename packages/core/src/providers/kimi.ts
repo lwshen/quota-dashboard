@@ -94,6 +94,7 @@ const kimiCodeApiStrategy: ProviderFetchStrategy = {
 export const kimiDescriptor: ProviderDescriptor = {
   provider: "kimi",
   label: "Kimi (Code API)",
+  accentColor: "#8b7cff",
   producesRateWindows: true,
   credentialFields: [
     {

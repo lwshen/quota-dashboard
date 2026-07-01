@@ -19,12 +19,14 @@ export async function GET() {
     if (s?.snapshot) {
       // `extra` holds the raw upstream response; drop it so only UI fields are exposed.
       snapshot = { ...s.snapshot, extra: undefined };
-      // `identity` can carry account balance / email / org — admin-only.
-      if (!authed) snapshot = { ...snapshot, identity: undefined };
+      // `identity` (balance/email/org) and `providerCost` (dollar spend / credit balance)
+      // are account-billing data — admin-only, stripped for anonymous callers.
+      if (!authed) snapshot = { ...snapshot, identity: undefined, providerCost: undefined };
     }
     return {
       provider: d.provider,
       label: d.label,
+      accentColor: d.accentColor ?? null,
       producesRateWindows: d.producesRateWindows,
       snapshot,
       error: s?.error ?? null,

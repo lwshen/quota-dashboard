@@ -51,6 +51,7 @@ const moonshotStrategy: ProviderFetchStrategy = {
 export const moonshotDescriptor: ProviderDescriptor = {
   provider: "moonshot",
   label: "Moonshot (Balance)",
+  accentColor: "#22b8cf",
   producesRateWindows: false,
   credentialFields: [
     {

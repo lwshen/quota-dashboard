@@ -82,6 +82,8 @@ export interface RefreshResult {
 export interface ProviderDescriptor {
   provider: UsageProvider;
   label: string;
+  /** Accent color (any CSS color) for the provider dot/avatar in the UI. Optional; UI falls back to a neutral tone. */
+  accentColor?: string;
   credentialFields: CredentialField[];
   /** When false, the provider produces only balance/credits text, not time-varying RateWindows. */
   producesRateWindows: boolean;

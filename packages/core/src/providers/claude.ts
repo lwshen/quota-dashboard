@@ -127,6 +127,7 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
 export const claudeDescriptor: ProviderDescriptor = {
   provider: "claude",
   label: "Claude (OAuth 订阅)",
+  accentColor: "#d97757",
   producesRateWindows: true,
   credentialFields: [
     {
