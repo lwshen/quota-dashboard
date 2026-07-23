@@ -1,10 +1,25 @@
-import type { FetchContext, UsageProvider, UsageSnapshot } from "@quota/core";
+import type { FetchContext, HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
 import { getDescriptor, nodeHttpClient, runPipeline, UnauthorizedError } from "@quota/core";
+import { ENV } from "./env";
 import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "./store";
 
 export interface FetchResult {
   snapshot: UsageSnapshot | null;
   error: string | null;
+}
+
+function debugHttpClient(provider: UsageProvider): HttpClient {
+  if (!ENV.debug) return nodeHttpClient;
+
+  const logResponse = (response: HttpResponse): HttpResponse => {
+    console.log(`[quota-debug] ${provider} raw response (HTTP ${response.status}): ${response.body}`);
+    return response;
+  };
+
+  return {
+    get: async (...args) => logResponse(await nodeHttpClient.get(...args)),
+    post: nodeHttpClient.post,
+  };
 }
 
 export async function fetchAndStore(provider: UsageProvider): Promise<FetchResult> {
@@ -15,7 +30,7 @@ export async function fetchAndStore(provider: UsageProvider): Promise<FetchResul
   }
   const desc = getDescriptor(provider);
   let creds = stored.credentials;
-  const ctx: FetchContext = { now, http: nodeHttpClient, cachedSnapshot: null };
+  const ctx: FetchContext = { now, http: debugHttpClient(provider), cachedSnapshot: null };
 
   try {
     const snap = await runPipeline(desc, stored.mode, creds, ctx);
