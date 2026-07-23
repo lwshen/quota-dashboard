@@ -66,6 +66,8 @@ pnpm dev          # http://localhost:3000
 
 打开页面 → 点「+ 配置凭据」→ 选 provider、粘贴 key/token → 保存即抓取。后台每 `POLL_INTERVAL_SECONDS` 秒自动刷新。
 
+如需排查 provider 返回的数据，可设置 `DEBUG=true`。每次抓取时，原始 quota API 响应体会输出到**服务端控制台**，不会通过看板 API 返回；响应可能包含账户数据，请勿在生产环境开启。
+
 ## 构建 / 部署
 
 ```bash

@@ -10,4 +10,6 @@ export const ENV = {
   authSecret: process.env.AUTH_SECRET ?? "",
   // SECURITY: do not enable in production.
   authDisabled: (process.env.AUTH_DISABLED ?? "false") === "true",
+  // Logs raw quota API responses to the server console; never exposes them to clients.
+  debug: (process.env.DEBUG ?? "false") === "true",
 };
