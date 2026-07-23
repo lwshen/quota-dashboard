@@ -26,13 +26,32 @@ const ROUTINE_KEYS = [
 function windowFrom(node: unknown, windowMinutes: number | null): RateWindow | null {
   if (!node || typeof node !== "object") return null;
   const obj = node as Record<string, unknown>;
-  const util = num(obj.utilization);
+  // Top-level named windows use `utilization`; entries in `limits` use `percent`.
+  const util = num(obj.utilization) ?? num(obj.percent);
   if (util == null) return null;
   return {
     usedPercent: clampPercent(util),
     windowMinutes,
     resetsAt: parseIsoOrUnix(obj.resets_at ?? obj.resetsAt),
   };
+}
+
+/** The `limits` array carries the currently active model-scoped weekly limit. */
+function activeScopedWindow(limits: unknown): { title: string; window: RateWindow } | null {
+  if (!Array.isArray(limits)) return null;
+  const scoped = limits.find((item) => {
+    if (!item || typeof item !== "object") return false;
+    const limit = item as Record<string, unknown>;
+    return limit.kind === "weekly_scoped" && limit.is_active === true;
+  }) as Record<string, unknown> | undefined;
+  if (!scoped) return null;
+
+  const window = windowFrom(scoped, 10080);
+  if (!window) return null;
+  const scope = scoped.scope as Record<string, unknown> | null;
+  const model = scope?.model as Record<string, unknown> | null;
+  const displayName = typeof model?.display_name === "string" ? model.display_name.trim() : "";
+  return { title: displayName ? `${displayName} (7d)` : "模型窗口 (7d)", window };
 }
 
 const claudeOAuthStrategy: ProviderFetchStrategy = {
@@ -65,6 +84,8 @@ const claudeOAuthStrategy: ProviderFetchStrategy = {
     const extra: NamedRateWindow[] = [];
     const routineWin = windowFrom(pick(j, ROUTINE_KEYS), 10080);
     if (routineWin) extra.push({ id: "routines", title: "Routines (7d)", window: routineWin, usageKnown: true });
+    const scopedWin = activeScopedWindow(j.limits);
+    if (scopedWin) extra.push({ id: "weekly-scoped", title: scopedWin.title, window: scopedWin.window, usageKnown: true });
 
     let cost: ProviderCostSnapshot | null = null;
     const eu = j.extra_usage;
