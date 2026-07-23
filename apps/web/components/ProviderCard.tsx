@@ -51,9 +51,12 @@ export function ProviderCard({
     window: NonNullable<UsageSnapshot["primary"]>;
     indeterminate: boolean;
   }[] = [];
-  if (s?.primary) windows.push({ key: "primary", ...laneMeta(view.provider, "primary"), window: s.primary, indeterminate: !mainTrusted });
-  if (s?.secondary) windows.push({ key: "secondary", ...laneMeta(view.provider, "secondary"), window: s.secondary, indeterminate: !mainTrusted });
-  if (s?.tertiary) windows.push({ key: "tertiary", ...laneMeta(view.provider, "tertiary"), window: s.tertiary, indeterminate: !mainTrusted });
+  if (s?.primary)
+    windows.push({ key: "primary", ...laneMeta(view.provider, "primary", s.primary.windowMinutes), window: s.primary, indeterminate: !mainTrusted });
+  if (s?.secondary)
+    windows.push({ key: "secondary", ...laneMeta(view.provider, "secondary", s.secondary.windowMinutes), window: s.secondary, indeterminate: !mainTrusted });
+  if (s?.tertiary)
+    windows.push({ key: "tertiary", ...laneMeta(view.provider, "tertiary", s.tertiary.windowMinutes), window: s.tertiary, indeterminate: !mainTrusted });
   // NamedRateWindow.usageKnown === false means "show reset metadata, not real consumption".
   for (const e of s?.extraRateWindows ?? []) {
     windows.push({ key: `x-${e.id}`, title: e.title, sub: null, window: e.window, indeterminate: e.usageKnown === false });

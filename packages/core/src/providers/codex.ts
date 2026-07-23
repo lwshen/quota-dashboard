@@ -82,6 +82,14 @@ const codexOAuthStrategy: ProviderFetchStrategy = {
     }
 
     const planType = typeof j.plan_type === "string" ? j.plan_type : null;
+    const resetCredits = j.rate_limit_reset_credits as Record<string, unknown> | null;
+    const resetCount = num(resetCredits?.available_count);
+    const applicableResetCount = num(resetCredits?.applicable_available_count);
+    const identityDetails = [
+      planType ? `Plan: ${planType}` : null,
+      resetCount != null ? `重置次数: ${resetCount}` : null,
+      applicableResetCount != null ? `当前可用: ${applicableResetCount}` : null,
+    ].filter((detail): detail is string => detail != null);
     const snapshot: UsageSnapshot = {
       provider: "codex",
       primary,
@@ -89,7 +97,7 @@ const codexOAuthStrategy: ProviderFetchStrategy = {
       tertiary: null,
       extraRateWindows: extra.length ? extra : null,
       providerCost: cost,
-      identity: planType ? { providerID: "codex", loginMethod: `Plan: ${planType}` } : null,
+      identity: identityDetails.length ? { providerID: "codex", loginMethod: identityDetails.join(" · ") } : null,
       dataConfidence: primary || secondary ? "exact" : "unknown",
       updatedAt: ctx.now.toISOString(),
     };

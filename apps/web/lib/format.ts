@@ -48,10 +48,21 @@ export function splitLabel(label: string): { name: string; tag: string | null } 
 }
 
 /** Meter title + sub-label for a given provider lane. */
-export function laneMeta(provider: string, lane: "primary" | "secondary" | "tertiary"): { title: string; sub: string | null } {
+export function laneMeta(
+  provider: string,
+  lane: "primary" | "secondary" | "tertiary",
+  windowMinutes?: number | null,
+): { title: string; sub: string | null } {
   if (lane === "tertiary") return { title: "模型窗口", sub: null };
-  if (provider === "claude" || provider === "codex") {
+  if (provider === "claude") {
     return lane === "primary" ? { title: "5小时窗口", sub: "5h" } : { title: "7天窗口", sub: "7d" };
+  }
+  if (provider === "codex") {
+    // Codex may return only one window. Label it from its actual duration rather
+    // than assuming that the first response field is always the 5-hour limit.
+    if (windowMinutes != null && windowMinutes >= 10080) return { title: "7天窗口", sub: "7d" };
+    if (windowMinutes != null && windowMinutes <= 300) return { title: "5小时窗口", sub: "5h" };
+    return lane === "primary" ? { title: "主窗口", sub: null } : { title: "次窗口", sub: null };
   }
   if (provider === "kimi") {
     return lane === "primary" ? { title: "周用量", sub: "Weekly" } : { title: "5小时速率", sub: "Rate" };
