@@ -68,6 +68,25 @@ Open the page → click "+ Add credentials" → pick a provider, paste the key/t
 
 To inspect a provider response while debugging, set `DEBUG=true`. Raw quota API response bodies are written to the **server console** during each fetch and are never returned by the dashboard API. Do not enable this in production, because responses may contain account data.
 
+## Quota-reset notifications
+
+The poller can push a message when a rate window gets fresh quota — e.g. a 5-hour window that had hit 100% rolls over, or the weekly window resets. Detection compares consecutive snapshots server-side (a sharp used% drop on the same window), so it works for every provider that reports rate windows.
+
+Feishu (Lark) group bot is built in:
+
+1. In a Feishu group: settings → Bots → add a **Custom Bot**, copy its webhook URL (optionally enable signature verification and copy the secret).
+2. Set the env vars:
+
+```bash
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+FEISHU_WEBHOOK_SECRET=   # only if signature verification is enabled
+NOTIFY_MIN_USED_PERCENT=80   # only notify windows that had reached this used%; 0 = every reset
+```
+
+3. Verify delivery with `POST /api/notify/test` (requires a logged-in session; the dashboard cookie works: `curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`).
+
+Reset times in messages use the server timezone — set `TZ` (e.g. `TZ=Asia/Shanghai`) in your deployment. Other channels (Telegram, Slack, ...) can be added by implementing the `NotifyChannel` interface in `apps/web/lib/notify/` and registering it in `notify/index.ts`.
+
 ## Build / deploy
 
 ```bash

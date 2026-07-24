@@ -1,6 +1,7 @@
 import type { FetchContext, HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
 import { getDescriptor, nodeHttpClient, runPipeline, UnauthorizedError } from "@quota/core";
 import { ENV } from "./env";
+import { detectAndNotifyResets } from "./notify";
 import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "./store";
 
 export interface FetchResult {
@@ -34,6 +35,8 @@ export async function fetchAndStore(provider: UsageProvider): Promise<FetchResul
 
   try {
     const snap = await runPipeline(desc, stored.mode, creds, ctx);
+    // Before saveSnapshot: reset detection compares against the last stored good snapshot.
+    detectAndNotifyResets(provider, snap, now);
     saveSnapshot(provider, snap, null, now);
     return { snapshot: snap, error: null };
   } catch (e) {
@@ -43,6 +46,7 @@ export async function fetchAndStore(provider: UsageProvider): Promise<FetchResul
         creds = refreshed.credentials;
         updateCredentialSecret(provider, creds, now);
         const snap = await runPipeline(desc, stored.mode, creds, ctx);
+        detectAndNotifyResets(provider, snap, now);
         saveSnapshot(provider, snap, null, now);
         return { snapshot: snap, error: null };
       } catch (e2) {

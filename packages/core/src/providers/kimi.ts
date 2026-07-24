@@ -63,6 +63,9 @@ const kimiCodeApiStrategy: ProviderFetchStrategy = {
     const primary: RateWindow | null = weekly
       ? {
           usedPercent: weekly.usedPercent ?? 0,
+          // usedPercent 0 above may be a mask for "not computable"; flag it so consumers
+          // (reset detection) don't treat the placeholder as real consumption.
+          usageKnown: weekly.usedPercent != null,
           windowMinutes: null,
           resetsAt: weekly.resetsAt,
           resetDescription:
@@ -72,6 +75,7 @@ const kimiCodeApiStrategy: ProviderFetchStrategy = {
     const secondary: RateWindow | null = rate
       ? {
           usedPercent: rate.usedPercent ?? 0,
+          usageKnown: rate.usedPercent != null,
           windowMinutes: 300,
           resetsAt: rate.resetsAt,
           resetDescription:

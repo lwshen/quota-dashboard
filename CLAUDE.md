@@ -48,6 +48,7 @@ UI and backend need no changes — credential form fields and card rendering are
 - `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`.
 - `lib/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
 - `GET /api/usage` → returns stored snapshots with UI-safe fields only (raw upstream `extra` is stripped).
+- `lib/notify/` → quota-reset notifications. `detectQuotaResets` (`core/src/reset.ts`, pure) compares the new snapshot against the last good one from `snapshot_history`; `fetchAndStore` calls `detectAndNotifyResets` **before** `saveSnapshot` (which overwrites the comparison base). Channels implement `NotifyChannel` (`notify/types.ts`) and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
 
 ## Conventions & gotchas
 
@@ -60,7 +61,7 @@ UI and backend need no changes — credential form fields and card rendering are
 
 ## Environment variables
 
-Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60 — the usage endpoints rate-limit faster polling), `ENABLE_POLLER`.
+Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60 — the usage endpoints rate-limit faster polling), `ENABLE_POLLER`, `FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET` / `NOTIFY_MIN_USED_PERCENT` (quota-reset notifications; unset webhook URL disables them).
 
 ## Deployment
 

@@ -79,7 +79,15 @@ const claudeOAuthStrategy: ProviderFetchStrategy = {
 
     const primary = windowFrom(j.five_hour, 300);
     const secondary = windowFrom(j.seven_day, 10080);
-    const tertiary = windowFrom(j.seven_day_sonnet, 10080) ?? windowFrom(j.seven_day_opus, 10080);
+    // Tag the tertiary source: sonnet and opus are distinct quotas, and comparing one
+    // against the other across snapshots (e.g. in reset detection) would be meaningless.
+    const sonnet = windowFrom(j.seven_day_sonnet, 10080);
+    const opus = windowFrom(j.seven_day_opus, 10080);
+    const tertiary = sonnet
+      ? { ...sonnet, sourceKey: "seven_day_sonnet" }
+      : opus
+        ? { ...opus, sourceKey: "seven_day_opus" }
+        : null;
 
     const extra: NamedRateWindow[] = [];
     const routineWin = windowFrom(pick(j, ROUTINE_KEYS), 10080);
