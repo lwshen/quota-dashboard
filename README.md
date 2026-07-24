@@ -85,6 +85,8 @@ NOTIFY_MIN_USED_PERCENT=80   # only notify windows that had reached this used%; 
 
 3. Verify delivery with `POST /api/notify/test` (requires a logged-in session; the dashboard cookie works: `curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`).
 
+When channels are configured, a one-shot startup message is also sent as the service boots (useful as a restart/liveness signal).
+
 Reset times in messages use the server timezone — set `TZ` (e.g. `TZ=Asia/Shanghai`) in your deployment. Other channels (Telegram, Slack, ...) can be added by implementing the `NotifyChannel` interface in `apps/web/lib/notify/` and registering it in `notify/index.ts`.
 
 ## Build / deploy
