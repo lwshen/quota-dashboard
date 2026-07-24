@@ -10,6 +10,10 @@ export interface RateWindow {
   resetsAt?: string | null;
   resetDescription?: string | null;
   nextRegenPercent?: number | null;
+  /** false = usedPercent is a masked placeholder, not real consumption. Absent = trustworthy. */
+  usageKnown?: boolean;
+  /** Upstream bucket identity for lanes whose content can switch sources (e.g. claude tertiary). */
+  sourceKey?: string | null;
 }
 
 export function remainingPercent(w: RateWindow): number {

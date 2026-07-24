@@ -37,6 +37,9 @@ export function saveCredential(provider: UsageProvider, mode: SourceMode, creds:
          mode=excluded.mode, data=excluded.data, updated_at=excluded.updated_at, enabled=1`,
     )
     .run(provider, mode, encrypt(JSON.stringify(creds)), now.toISOString());
+  // The new credential may belong to a different account; the old account's history
+  // must not seed reset-notification comparisons.
+  db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
 }
 
 export function updateCredentialSecret(provider: UsageProvider, creds: ProviderCredentials, now: Date): void {
@@ -48,6 +51,7 @@ export function updateCredentialSecret(provider: UsageProvider, creds: ProviderC
 export function deleteCredential(provider: UsageProvider): void {
   db().prepare(`DELETE FROM credentials WHERE provider=?`).run(provider);
   db().prepare(`DELETE FROM snapshots WHERE provider=?`).run(provider);
+  db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
 }
 
 export function listCredentials(): StoredCredential[] {
@@ -103,8 +107,10 @@ export function listSnapshots(): SnapshotRow[] {
 }
 
 export function historyFor(provider: UsageProvider, limit = 200): { snapshot: UsageSnapshot; fetchedAt: string }[] {
+  // Order by id (save order), not fetched_at: fetched_at is stamped at fetch start, so
+  // overlapping fetches can persist out of chronological order and ties are unordered.
   const rows = db()
-    .prepare(`SELECT snapshot, fetched_at FROM snapshot_history WHERE provider=? ORDER BY fetched_at DESC LIMIT ?`)
+    .prepare(`SELECT snapshot, fetched_at FROM snapshot_history WHERE provider=? ORDER BY id DESC LIMIT ?`)
     .all(provider, limit) as { snapshot: string; fetched_at: string }[];
   return rows.reverse().map((r) => ({ snapshot: JSON.parse(r.snapshot) as UsageSnapshot, fetchedAt: r.fetched_at }));
 }

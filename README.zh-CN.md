@@ -68,6 +68,25 @@ pnpm dev          # http://localhost:3000
 
 如需排查 provider 返回的数据，可设置 `DEBUG=true`。每次抓取时，原始 quota API 响应体会输出到**服务端控制台**，不会通过看板 API 返回；响应可能包含账户数据，请勿在生产环境开启。
 
+## 配额重置提醒
+
+当某个速率窗口拿到新额度时（例如打满 100% 的 5 小时窗口翻篇、或周额度重置），轮询器可以推送一条提醒。检测在服务端对比相邻两次快照（同一窗口 used% 骤降），对所有产出速率窗口的 provider 都生效。
+
+内置飞书群机器人：
+
+1. 在飞书群里：设置 → 群机器人 → 添加「自定义机器人」，复制 webhook 地址（如开启了「签名校验」再复制密钥）。
+2. 配置环境变量：
+
+```bash
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+FEISHU_WEBHOOK_SECRET=   # 仅在开启签名校验时填写
+NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口；0 = 每次重置都提醒
+```
+
+3. 用 `POST /api/notify/test` 验证连通性（需要已登录的会话，可带上看板 cookie：`curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`）。
+
+消息里的重置时间使用服务器时区，部署时请设置 `TZ`（如 `TZ=Asia/Shanghai`）。要接入其他渠道（Telegram、Slack 等），在 `apps/web/lib/notify/` 实现 `NotifyChannel` 接口并在 `notify/index.ts` 注册即可。
+
 ## 构建 / 部署
 
 ```bash
