@@ -85,6 +85,8 @@ NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口�
 
 3. 用 `POST /api/notify/test` 验证连通性（需要已登录的会话，可带上看板 cookie：`curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`）。
 
+配置了通知渠道后，服务启动时还会推送一条上线消息（可当作重启/存活信号）。
+
 消息里的重置时间使用服务器时区，部署时请设置 `TZ`（如 `TZ=Asia/Shanghai`）。要接入其他渠道（Telegram、Slack 等），在 `apps/web/lib/notify/` 实现 `NotifyChannel` 接口并在 `notify/index.ts` 注册即可。
 
 ## 构建 / 部署

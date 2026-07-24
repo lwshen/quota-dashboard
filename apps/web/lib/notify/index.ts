@@ -3,7 +3,7 @@ import { detectQuotaResets } from "@quota/core";
 import { ENV } from "../env";
 import { historyFor } from "../store";
 import { FeishuChannel } from "./feishu";
-import { buildQuotaResetMessage, buildTestMessage } from "./message";
+import { buildQuotaResetMessage, buildStartupMessage, buildTestMessage } from "./message";
 import type { NotifyChannel, NotifyDeliveryResult, NotifyMessage } from "./types";
 import { NotifyError } from "./types";
 
@@ -102,4 +102,22 @@ export function detectAndNotifyResets(provider: UsageProvider, next: UsageSnapsh
 
 export async function sendTestNotification(now: Date): Promise<NotifyDeliveryResult[]> {
   return dispatch(buildTestMessage(now));
+}
+
+let startupNotified = false;
+
+/** One-shot service-started message, called from instrumentation.ts; never throws. */
+export async function sendStartupNotification(now: Date): Promise<void> {
+  if (startupNotified || !notificationsEnabled()) return;
+  startupNotified = true;
+  try {
+    await dispatch(
+      buildStartupMessage(now, {
+        pollIntervalSeconds: Math.max(60, ENV.pollInterval),
+        pollerEnabled: ENV.enablePoller,
+      }),
+    );
+  } catch (e) {
+    console.error("[notify] startup notification failed:", e);
+  }
 }

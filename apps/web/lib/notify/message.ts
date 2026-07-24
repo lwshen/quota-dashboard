@@ -58,3 +58,11 @@ export function buildTestMessage(now: Date): NotifyMessage {
     lines: ["Quota Dashboard 通知渠道已配置成功。", `发送时间：${fmtTime(now.toISOString())}`],
   };
 }
+
+export function buildStartupMessage(now: Date, opts: { pollIntervalSeconds: number; pollerEnabled: boolean }): NotifyMessage {
+  const polling = opts.pollerEnabled ? `轮询间隔：${opts.pollIntervalSeconds} 秒` : "后台轮询已禁用（ENABLE_POLLER=false）";
+  return {
+    title: "🚀 服务已启动",
+    lines: ["Quota Dashboard 已启动，配额重置监控运行中。", polling, `启动时间：${fmtTime(now.toISOString())}`],
+  };
+}
