@@ -1,5 +1,6 @@
 // GET {base}/coding/v1/usages, Authorization: Bearer <key>.
-// usage -> weekly (primary); limits[0].detail -> 5h rate (secondary, windowMinutes=300 hardcoded client-side).
+// usage -> weekly (primary); limits[0].detail -> 5h rate (secondary).
+// Upstream reports no window durations; both windowMinutes values are hardcoded client-side.
 
 import type { ProviderDescriptor, ProviderFetchStrategy } from "../adapter";
 import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
@@ -66,7 +67,7 @@ const kimiCodeApiStrategy: ProviderFetchStrategy = {
           // usedPercent 0 above may be a mask for "not computable"; flag it so consumers
           // (reset detection) don't treat the placeholder as real consumption.
           usageKnown: weekly.usedPercent != null,
-          windowMinutes: null,
+          windowMinutes: 10080,
           resetsAt: weekly.resetsAt,
           resetDescription:
             weekly.used != null && weekly.limit != null ? `${weekly.used}/${weekly.limit} requests` : null,
