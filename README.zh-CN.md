@@ -80,7 +80,7 @@ pnpm dev          # http://localhost:3000
 ```bash
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 FEISHU_WEBHOOK_SECRET=   # 仅在开启签名校验时填写
-NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口；0 = 每次重置都提醒
+NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口；0 = 每次重置都提醒（周窗口不受限，每次重置都会提醒）
 ```
 
 3. 用 `POST /api/notify/test` 验证连通性（需要已登录的会话，可带上看板 cookie：`curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`）。

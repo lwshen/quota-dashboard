@@ -17,11 +17,16 @@ export interface QuotaResetEvent {
 }
 
 export interface ResetDetectionOptions {
-  /** Only report lanes that had reached this used% before resetting. Default 80; 0 reports every reset. */
+  /**
+   * Only report lanes that had reached this used% before resetting. Default 80; 0 reports
+   * every reset. Weekly-or-longer windows are exempt: their resets are always reported.
+   */
   minUsedPercent?: number;
 }
 
 const STANDARD_LANES = ["primary", "secondary", "tertiary"] as const;
+
+const WEEKLY_WINDOW_MINUTES = 7 * 24 * 60;
 
 function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number): boolean {
   // Masked placeholder percentages (e.g. kimi when upstream omits limit/used) are not comparable.
@@ -32,9 +37,28 @@ function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number): bo
     return false;
   }
   if (prev.sourceKey && next.sourceKey && prev.sourceKey !== next.sourceKey) return false;
-  if (prev.usedPercent < minUsedPercent) return false;
   // Identical resetsAt means the window has not rolled over yet.
   if (prev.resetsAt && next.resetsAt && prev.resetsAt === next.resetsAt) return false;
+
+  const windowMinutes = next.windowMinutes ?? prev.windowMinutes;
+  const weekly = windowMinutes != null && windowMinutes >= WEEKLY_WINDOW_MINUTES;
+  if (weekly) {
+    // Weekly quotas reset rarely and matter regardless of how much had been used,
+    // so every rollover is reported (minUsedPercent does not apply).
+    const p = Date.parse(prev.resetsAt ?? "");
+    const n = Date.parse(next.resetsAt ?? "");
+    if (Number.isFinite(p) && Number.isFinite(n)) {
+      // A rollover jumps resetsAt forward by ~the window length. Some providers recompute
+      // resetsAt as now+remaining each poll, so small forward drift is not a rollover.
+      return n - p >= (windowMinutes * 60_000) / 2;
+    }
+    // No comparable timestamps: fall back to a usage drop. Weekly decay between two
+    // polls is negligible (~0.05% at 5min polls), so a small cut is still safe.
+    const drop = prev.usedPercent - next.usedPercent;
+    return drop >= 5 && next.usedPercent <= prev.usedPercent / 2;
+  }
+
+  if (prev.usedPercent < minUsedPercent) return false;
   // A genuine reset drops sharply. Rolling-window decay between two polls is bounded
   // by pollInterval/windowLength (~2% for a 5h window at 5min polls), far below these cuts.
   const drop = prev.usedPercent - next.usedPercent;

@@ -80,7 +80,7 @@ Feishu (Lark) group bot is built in:
 ```bash
 FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
 FEISHU_WEBHOOK_SECRET=   # only if signature verification is enabled
-NOTIFY_MIN_USED_PERCENT=80   # only notify windows that had reached this used%; 0 = every reset
+NOTIFY_MIN_USED_PERCENT=80   # only notify windows that had reached this used%; 0 = every reset (weekly windows always notify)
 ```
 
 3. Verify delivery with `POST /api/notify/test` (requires a logged-in session; the dashboard cookie works: `curl -X POST -b "qd_session=..." http://localhost:3000/api/notify/test`).
