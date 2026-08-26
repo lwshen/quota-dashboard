@@ -7,6 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "setup:env": "node scripts/setup-env.mjs",
     "dev": "pnpm --filter @quota/web dev",
     "build": "pnpm --filter @quota/web build",
     "start": "pnpm --filter @quota/web start",

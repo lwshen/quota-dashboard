@@ -57,13 +57,15 @@ quota-dashboard/
 cd quota-dashboard
 pnpm install
 
-# 配置环境变量
-cp apps/web/.env.example apps/web/.env
-# 生成加密主密钥并填入 APP_ENC_KEY
-openssl rand -hex 32
+# 生成开发用的 apps/web/.env：自动生成 APP_ENC_KEY / AUTH_SECRET /
+# DASHBOARD_PASSWORD，并设置 AUTH_DISABLED=true 跳过登录。
+# 可重复执行——已有 .env 不会被覆盖（要重新生成加 `-- --force`）。
+pnpm setup:env
 
 pnpm dev          # http://localhost:3000
 ```
+
+想手动配置：`cp apps/web/.env.example apps/web/.env`，再把 `openssl rand -hex 32` 的结果填进 `APP_ENC_KEY`。
 
 打开页面 → 点「+ 配置凭据」→ 选 provider、粘贴 key/token → 保存即抓取。后台每 `POLL_INTERVAL_SECONDS` 秒自动刷新。
 

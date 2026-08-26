@@ -57,13 +57,15 @@ See the comment at the top of each `providers/*.ts` for how to obtain credential
 cd quota-dashboard
 pnpm install
 
-# Configure environment variables
-cp apps/web/.env.example apps/web/.env
-# Generate the master encryption key and put it in APP_ENC_KEY
-openssl rand -hex 32
+# Generate apps/web/.env for development: fresh APP_ENC_KEY / AUTH_SECRET /
+# DASHBOARD_PASSWORD, plus AUTH_DISABLED=true so login is skipped.
+# Safe to re-run — an existing .env is kept (add `-- --force` to regenerate).
+pnpm setup:env
 
 pnpm dev          # http://localhost:3000
 ```
+
+Prefer to do it by hand? `cp apps/web/.env.example apps/web/.env`, then put an `openssl rand -hex 32` value in `APP_ENC_KEY`.
 
 Open the page → click "+ Add credentials" → pick a provider, paste the key/token → save and it fetches immediately. The background poller refreshes every `POLL_INTERVAL_SECONDS` seconds.
 
