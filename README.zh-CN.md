@@ -32,7 +32,7 @@ quota-dashboard/
 │     ├─ decode.ts         # 容错解码 helper
 │     ├─ http.ts           # HttpClient 抽象 + Node fetch 实现
 │     ├─ registry.ts       # provider 注册表
-│     └─ providers/        # kimi / moonshot / claude / codex
+│     └─ providers/        # kimi / moonshot / claude / codex / rightapi
 └─ apps/web/               # Next.js 看板 + 后端代理
    ├─ app/                 # 页面 + API routes
    ├─ components/          # ProviderCard / RateWindowBar / 表单
@@ -47,6 +47,7 @@ quota-dashboard/
 | **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | 余额（无窗口） |
 | **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/模型/routines 窗口 + extra 花费 |
 | **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d 窗口 + credits |
+| **RightAPI** | account (`www.rightapi.ai/auth/me`) | user token | 余额（无窗口） |
 
 凭据获取方式见各 `providers/*.ts` 顶部注释。Claude/Codex 的 token 可从本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 复制粘贴。
 
@@ -111,7 +112,7 @@ docker run -p 3000:3000 \
 
 - **鉴权（fail-closed）**：`middleware.ts` 拦截所有页面与 `/api/*`。需要 `DASHBOARD_PASSWORD` 登录，签发 HMAC 签名的 httpOnly session cookie。**未设置口令时一律拒绝访问**，避免裸奔上线。本地开发可设 `AUTH_DISABLED=true` 跳过。
 - **限流**：进程内按 IP 限流，登录路径更严（防暴破）。读 `x-forwarded-for`，因此务必放在反向代理之后。
-- **SSRF 防护**：用户提供的 Kimi `baseUrlOverride` 必须是公网 https，且会做字面量 + DNS 解析双重检查，拒绝私网 / 回环 / 云元数据地址。
+- **SSRF 防护**：用户提供的 Kimi / RightAPI `baseUrlOverride` 必须是公网 https，且会做字面量 + DNS 解析双重检查，拒绝私网 / 回环 / 云元数据地址。
 - **凭据保护**：AES-256-GCM 加密后存 SQLite，**绝不回传前端**；`/api/usage` 只暴露 UI 所需字段（剔除原始上游响应 `extra`）。
 - **CSRF**：session cookie 用 `sameSite=lax`，跨站发起的写请求不带 cookie，天然挡住。
 

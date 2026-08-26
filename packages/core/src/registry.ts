@@ -1,12 +1,13 @@
 import type { ProviderDescriptor } from "./adapter";
 import type { UsageProvider } from "./model";
-import { claudeDescriptor, codexDescriptor, kimiDescriptor, moonshotDescriptor } from "./providers";
+import { claudeDescriptor, codexDescriptor, kimiDescriptor, moonshotDescriptor, rightapiDescriptor } from "./providers";
 
 const DESCRIPTORS: Record<UsageProvider, ProviderDescriptor> = {
   kimi: kimiDescriptor,
   moonshot: moonshotDescriptor,
   claude: claudeDescriptor,
   codex: codexDescriptor,
+  rightapi: rightapiDescriptor,
 };
 
 export const ALL_PROVIDERS = Object.keys(DESCRIPTORS) as UsageProvider[];
