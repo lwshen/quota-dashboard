@@ -1,4 +1,4 @@
-export type UsageProvider = "claude" | "codex" | "kimi" | "moonshot";
+export type UsageProvider = "claude" | "codex" | "kimi" | "moonshot" | "rightapi";
 
 export type UsageDataConfidence = "exact" | "estimated" | "percentOnly" | "unknown";
 
