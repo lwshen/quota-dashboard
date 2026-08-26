@@ -8,6 +8,7 @@ Package manager is **pnpm** (via corepack; pinned `pnpm@11.9.0`), Node **>= 22**
 
 ```bash
 pnpm install            # install workspace deps
+pnpm setup:env          # generate apps/web/.env for local dev (idempotent; -- --force to regenerate)
 pnpm dev                # next dev for @quota/web → http://localhost:3000
 pnpm build              # next build (standalone output)
 pnpm start              # run the standalone production server
@@ -16,7 +17,7 @@ pnpm typecheck          # tsc --noEmit across all packages (pnpm -r typecheck)
 
 There is **no test suite and no linter/formatter configured** — `pnpm typecheck` is the only automated gate. Don't invent `test`/`lint` commands; if you add tests, wire up the tooling first.
 
-Before running locally, copy `apps/web/.env.example` → `apps/web/.env` and set `APP_ENC_KEY` (`openssl rand -hex 32`). For local dev you can set `AUTH_DISABLED=true` to skip login.
+Before running locally, run `pnpm setup:env` (`scripts/setup-env.mjs`): it copies `apps/web/.env.example` → `apps/web/.env`, generates `APP_ENC_KEY` / `AUTH_SECRET` / `DASHBOARD_PASSWORD`, and sets `AUTH_DISABLED=true` so login is skipped. It never overwrites an existing `.env` unless given `--force` (which first writes a `.env.bak`). To do it by hand instead: copy the example and set `APP_ENC_KEY` (`openssl rand -hex 32`).
 
 ## Architecture
 
