@@ -28,7 +28,24 @@ const STANDARD_LANES = ["primary", "secondary", "tertiary"] as const;
 
 const WEEKLY_WINDOW_MINUTES = 7 * 24 * 60;
 
-function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number): boolean {
+/**
+ * How far past the elapsed poll gap `resetsAt` must move before a weekly usage drop counts
+ * as an early reset. Providers that recompute `resetsAt` as now+remaining advance it by
+ * roughly the gap itself, so only the excess over that is evidence of a restarted window.
+ */
+const EARLY_RESET_ADVANCE_MARGIN_MS = 60 * 60 * 1000;
+
+/** Wall-clock between two snapshots, used to size the drift a provider can show. */
+function elapsedBetween(prev: UsageSnapshot, next: UsageSnapshot): number {
+  const a = Date.parse(prev.updatedAt);
+  const b = Date.parse(next.updatedAt);
+  // Unusable stamps leave only the flat margin below; still far stricter than a bare drop.
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+  // History can persist out of order (see historyFor), so a negative gap is not meaningful.
+  return Math.max(0, b - a);
+}
+
+function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number, elapsedMs: number): boolean {
   // Masked placeholder percentages (e.g. kimi when upstream omits limit/used) are not comparable.
   if (prev.usageKnown === false || next.usageKnown === false) return false;
   // A lane whose window identity changed (provider lane reassignment, sonnet↔opus switch)
@@ -45,18 +62,23 @@ function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number): bo
   if (weekly) {
     // Weekly quotas reset rarely and matter regardless of how much had been used,
     // so every rollover is reported (minUsedPercent does not apply).
-    // Weekly decay between two polls is negligible (~0.05% at 5min polls), so a sharp cut
-    // is a rollover on its own. This is the only signal for an early reset (codex weekly
-    // quota refreshed mid-window), where resetsAt moves forward by far less than a window.
     const drop = prev.usedPercent - next.usedPercent;
-    if (drop >= 5 && next.usedPercent <= prev.usedPercent / 2) return true;
-    // Natural expiry jumps resetsAt forward by ~the window length even when usage was
-    // already near 0. Some providers recompute resetsAt as now+remaining each poll,
-    // so small forward drift is not a rollover.
+    const sharpCut = drop >= 5 && next.usedPercent <= prev.usedPercent / 2;
     const p = Date.parse(prev.resetsAt ?? "");
     const n = Date.parse(next.resetsAt ?? "");
-    if (Number.isFinite(p) && Number.isFinite(n)) return n - p >= (windowMinutes * 60_000) / 2;
-    return false;
+    if (Number.isFinite(p) && Number.isFinite(n)) {
+      // Natural expiry advances resetsAt by ~the window length, whatever the usage was.
+      const advance = n - p;
+      if (advance >= (windowMinutes * 60_000) / 2) return true;
+      // An early refresh restarts the window mid-flight, so resetsAt advances by far less
+      // than that — but still well clear of the poll gap. The cut cannot stand on its own:
+      // a sliding window sheds a burst that aged out of its tail and can halve with no
+      // rollover, and the identical-resetsAt guard above misses that for a drifting provider.
+      return advance - elapsedMs >= EARLY_RESET_ADVANCE_MARGIN_MS && sharpCut;
+    }
+    // No comparable timestamps: the cut is all there is to go on, with no way to
+    // corroborate it. Weekly decay is ~0.05% per 5min poll when usage is evenly spread.
+    return sharpCut;
   }
 
   if (prev.usedPercent < minUsedPercent) return false;
@@ -94,12 +116,13 @@ export function detectQuotaResets(
   // dataConfidence describes specific lanes and would drop genuine resets on others.
   const raw = opts.minUsedPercent;
   const minUsedPercent = typeof raw === "number" && Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 80;
+  const elapsedMs = elapsedBetween(prev, next);
 
   const events: QuotaResetEvent[] = [];
   for (const lane of STANDARD_LANES) {
     const p = prev[lane];
     const n = next[lane];
-    if (!p || !n || !isReset(p, n, minUsedPercent)) continue;
+    if (!p || !n || !isReset(p, n, minUsedPercent, elapsedMs)) continue;
     events.push(eventFrom(next.provider, lane, null, p, n));
   }
 
@@ -112,7 +135,7 @@ export function detectQuotaResets(
     // Same id can carry different quotas over time (claude "weekly-scoped" tracks whichever
     // model limit is active; the title names it) — a changed title means a different window.
     if (!p || p.title !== ex.title) continue;
-    if (!isReset(p.window, ex.window, minUsedPercent)) continue;
+    if (!isReset(p.window, ex.window, minUsedPercent, elapsedMs)) continue;
     events.push(eventFrom(next.provider, ex.id, ex.title, p.window, ex.window));
   }
   return events;
