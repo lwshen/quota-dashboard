@@ -45,17 +45,18 @@ function isReset(prev: RateWindow, next: RateWindow, minUsedPercent: number): bo
   if (weekly) {
     // Weekly quotas reset rarely and matter regardless of how much had been used,
     // so every rollover is reported (minUsedPercent does not apply).
+    // Weekly decay between two polls is negligible (~0.05% at 5min polls), so a sharp cut
+    // is a rollover on its own. This is the only signal for an early reset (codex weekly
+    // quota refreshed mid-window), where resetsAt moves forward by far less than a window.
+    const drop = prev.usedPercent - next.usedPercent;
+    if (drop >= 5 && next.usedPercent <= prev.usedPercent / 2) return true;
+    // Natural expiry jumps resetsAt forward by ~the window length even when usage was
+    // already near 0. Some providers recompute resetsAt as now+remaining each poll,
+    // so small forward drift is not a rollover.
     const p = Date.parse(prev.resetsAt ?? "");
     const n = Date.parse(next.resetsAt ?? "");
-    if (Number.isFinite(p) && Number.isFinite(n)) {
-      // A rollover jumps resetsAt forward by ~the window length. Some providers recompute
-      // resetsAt as now+remaining each poll, so small forward drift is not a rollover.
-      return n - p >= (windowMinutes * 60_000) / 2;
-    }
-    // No comparable timestamps: fall back to a usage drop. Weekly decay between two
-    // polls is negligible (~0.05% at 5min polls), so a small cut is still safe.
-    const drop = prev.usedPercent - next.usedPercent;
-    return drop >= 5 && next.usedPercent <= prev.usedPercent / 2;
+    if (Number.isFinite(p) && Number.isFinite(n)) return n - p >= (windowMinutes * 60_000) / 2;
+    return false;
   }
 
   if (prev.usedPercent < minUsedPercent) return false;
