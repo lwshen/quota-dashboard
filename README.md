@@ -47,6 +47,7 @@ quota-dashboard/
 | **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | Balance (no window) |
 | **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/model/routines windows + extra spend |
 | **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d windows + credits |
+| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex | same as Codex |
 | **RightAPI** | account (`www.rightapi.ai/auth/me`) | user token | Balance (no window) |
 
 See the comment at the top of each `providers/*.ts` for how to obtain credentials. Claude/Codex tokens can be copy-pasted from your local `~/.claude/.credentials.json` and `~/.codex/auth.json`.

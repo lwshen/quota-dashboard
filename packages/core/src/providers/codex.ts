@@ -1,9 +1,11 @@
 // GET usage requires headers: Authorization: Bearer <access_token>, User-Agent, ChatGPT-Account-Id: <account_id>.
 // Window role keyed by windowMinutes: 300=session(primary), 10080=weekly(secondary).
+// Storage is keyed by provider id, so a second ChatGPT account gets its own slot ("codex2")
+// built from the same implementation — see makeCodexDescriptor at the bottom.
 
-import type { FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
+import type { CredentialField, FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
 import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
-import type { NamedRateWindow, ProviderCostSnapshot, RateWindow, UsageSnapshot } from "../model";
+import type { NamedRateWindow, ProviderCostSnapshot, RateWindow, UsageProvider, UsageSnapshot } from "../model";
 import { clampPercent, num, parseIsoOrUnix, retryAfterSeconds, safeJson } from "../decode";
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -34,76 +36,78 @@ function windowFrom(node: unknown): WindowParsed | null {
   };
 }
 
-const codexOAuthStrategy: ProviderFetchStrategy = {
-  id: "codex-oauth",
-  sourceMode: "oauth",
-  isAvailable: (c) => !!c.bearerToken,
-  shouldFallback: () => false,
-  async fetch(c, ctx) {
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${c.bearerToken}`,
-      "User-Agent": USER_AGENT,
-      Accept: "application/json",
-    };
-    if (c.accountId) headers["ChatGPT-Account-Id"] = c.accountId;
+function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy {
+  return {
+    id: `${provider}-oauth`,
+    sourceMode: "oauth",
+    isAvailable: (c) => !!c.bearerToken,
+    shouldFallback: () => false,
+    async fetch(c, ctx) {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${c.bearerToken}`,
+        "User-Agent": USER_AGENT,
+        Accept: "application/json",
+      };
+      if (c.accountId) headers["ChatGPT-Account-Id"] = c.accountId;
 
-    const res = await ctx.http.get(USAGE_URL, headers, { timeoutMs: 30_000 });
-    if (res.status === 401 || res.status === 403) throw new UnauthorizedError();
-    if (res.status === 429) throw new RateLimitedError(retryAfterSeconds(res.headers));
-    if (res.status >= 400) throw new UpstreamError(res.status, res.body.slice(0, 200));
-    const j = safeJson(res.body);
-    if (!j) throw new UpstreamError(res.status, "invalid JSON");
+      const res = await ctx.http.get(USAGE_URL, headers, { timeoutMs: 30_000 });
+      if (res.status === 401 || res.status === 403) throw new UnauthorizedError();
+      if (res.status === 429) throw new RateLimitedError(retryAfterSeconds(res.headers));
+      if (res.status >= 400) throw new UpstreamError(res.status, res.body.slice(0, 200));
+      const j = safeJson(res.body);
+      if (!j) throw new UpstreamError(res.status, "invalid JSON");
 
-    const rl = (j.rate_limit ?? {}) as Record<string, unknown>;
-    const a = windowFrom(rl.primary_window);
-    const b = windowFrom(rl.secondary_window);
-    let primary: RateWindow | null = a?.window ?? null;
-    let secondary: RateWindow | null = b?.window ?? null;
-    // Shorter window = primary(session), longer = secondary(weekly).
-    if (a && b && (a.minutes ?? 0) > (b.minutes ?? 0)) {
-      primary = b.window;
-      secondary = a.window;
-    }
-
-    const extra: NamedRateWindow[] = [];
-    const additional = Array.isArray(j.additional_rate_limits) ? j.additional_rate_limits : [];
-    for (const item of additional) {
-      const w = windowFrom(item?.rate_limit?.primary_window) ?? windowFrom(item?.rate_limit?.secondary_window);
-      if (w) {
-        const name = String(item?.limit_name ?? item?.metered_feature ?? "extra");
-        extra.push({ id: name, title: name, window: w.window, usageKnown: true });
+      const rl = (j.rate_limit ?? {}) as Record<string, unknown>;
+      const a = windowFrom(rl.primary_window);
+      const b = windowFrom(rl.secondary_window);
+      let primary: RateWindow | null = a?.window ?? null;
+      let secondary: RateWindow | null = b?.window ?? null;
+      // Shorter window = primary(session), longer = secondary(weekly).
+      if (a && b && (a.minutes ?? 0) > (b.minutes ?? 0)) {
+        primary = b.window;
+        secondary = a.window;
       }
-    }
 
-    let cost: ProviderCostSnapshot | null = null;
-    const credits = j.credits;
-    if (credits && credits.has_credits && !credits.unlimited && credits.balance != null) {
-      cost = { used: 0, limit: num(credits.balance) ?? 0, currencyCode: "USD", period: "Credits balance" };
-    }
+      const extra: NamedRateWindow[] = [];
+      const additional = Array.isArray(j.additional_rate_limits) ? j.additional_rate_limits : [];
+      for (const item of additional) {
+        const w = windowFrom(item?.rate_limit?.primary_window) ?? windowFrom(item?.rate_limit?.secondary_window);
+        if (w) {
+          const name = String(item?.limit_name ?? item?.metered_feature ?? "extra");
+          extra.push({ id: name, title: name, window: w.window, usageKnown: true });
+        }
+      }
 
-    const planType = typeof j.plan_type === "string" ? j.plan_type : null;
-    const resetCredits = j.rate_limit_reset_credits as Record<string, unknown> | null;
-    const resetCount = num(resetCredits?.available_count);
-    const applicableResetCount = num(resetCredits?.applicable_available_count);
-    const identityDetails = [
-      planType ? `Plan: ${planType}` : null,
-      resetCount != null ? `重置次数: ${resetCount}` : null,
-      applicableResetCount != null ? `当前可用: ${applicableResetCount}` : null,
-    ].filter((detail): detail is string => detail != null);
-    const snapshot: UsageSnapshot = {
-      provider: "codex",
-      primary,
-      secondary,
-      tertiary: null,
-      extraRateWindows: extra.length ? extra : null,
-      providerCost: cost,
-      identity: identityDetails.length ? { providerID: "codex", loginMethod: identityDetails.join(" · ") } : null,
-      dataConfidence: primary || secondary ? "exact" : "unknown",
-      updatedAt: ctx.now.toISOString(),
-    };
-    return snapshot;
-  },
-};
+      let cost: ProviderCostSnapshot | null = null;
+      const credits = j.credits;
+      if (credits && credits.has_credits && !credits.unlimited && credits.balance != null) {
+        cost = { used: 0, limit: num(credits.balance) ?? 0, currencyCode: "USD", period: "Credits balance" };
+      }
+
+      const planType = typeof j.plan_type === "string" ? j.plan_type : null;
+      const resetCredits = j.rate_limit_reset_credits as Record<string, unknown> | null;
+      const resetCount = num(resetCredits?.available_count);
+      const applicableResetCount = num(resetCredits?.applicable_available_count);
+      const identityDetails = [
+        planType ? `Plan: ${planType}` : null,
+        resetCount != null ? `重置次数: ${resetCount}` : null,
+        applicableResetCount != null ? `当前可用: ${applicableResetCount}` : null,
+      ].filter((detail): detail is string => detail != null);
+      const snapshot: UsageSnapshot = {
+        provider,
+        primary,
+        secondary,
+        tertiary: null,
+        extraRateWindows: extra.length ? extra : null,
+        providerCost: cost,
+        identity: identityDetails.length ? { providerID: provider, loginMethod: identityDetails.join(" · ") } : null,
+        dataConfidence: primary || secondary ? "exact" : "unknown",
+        updatedAt: ctx.now.toISOString(),
+      };
+      return snapshot;
+    },
+  };
+}
 
 async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<RefreshResult> {
   if (!creds.refreshToken) throw new UnauthorizedError("missing refresh_token");
@@ -137,30 +141,39 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
   };
 }
 
-export const codexDescriptor: ProviderDescriptor = {
-  provider: "codex",
-  label: "Codex (ChatGPT 订阅)",
-  accentColor: "#19c37d",
-  producesRateWindows: true,
-  credentialFields: [
-    {
-      key: "bearerToken",
-      label: "Access Token",
-      required: true,
-      secret: true,
-      placeholder: "...",
-      help: "~/.codex/auth.json 里的 tokens.access_token",
-    },
-    {
-      key: "accountId",
-      label: "ChatGPT Account Id（推荐）",
-      required: false,
-      secret: false,
-      placeholder: "...",
-      help: "~/.codex/auth.json 里的 account_id",
-    },
-    { key: "refreshToken", label: "Refresh Token（可选）", required: false, secret: true },
-  ],
-  resolveStrategies: () => [codexOAuthStrategy],
-  refresh,
-};
+const CREDENTIAL_FIELDS: CredentialField[] = [
+  {
+    key: "bearerToken",
+    label: "Access Token",
+    required: true,
+    secret: true,
+    placeholder: "...",
+    help: "~/.codex/auth.json 里的 tokens.access_token",
+  },
+  {
+    key: "accountId",
+    label: "ChatGPT Account Id（推荐）",
+    required: false,
+    secret: false,
+    placeholder: "...",
+    help: "~/.codex/auth.json 里的 account_id",
+  },
+  { key: "refreshToken", label: "Refresh Token（可选）", required: false, secret: true },
+];
+
+/** One descriptor per ChatGPT account; each slot stores its own credential and snapshot. */
+function makeCodexDescriptor(provider: UsageProvider, label: string): ProviderDescriptor {
+  const strategy = makeCodexOAuthStrategy(provider);
+  return {
+    provider,
+    label,
+    accentColor: "#19c37d",
+    producesRateWindows: true,
+    credentialFields: CREDENTIAL_FIELDS,
+    resolveStrategies: () => [strategy],
+    refresh,
+  };
+}
+
+export const codexDescriptor = makeCodexDescriptor("codex", "Codex (ChatGPT 订阅)");
+export const codex2Descriptor = makeCodexDescriptor("codex2", "Codex #2 (ChatGPT 订阅)");
