@@ -57,7 +57,7 @@ export function laneMeta(
   if (provider === "claude") {
     return lane === "primary" ? { title: "5小时窗口", sub: "5h" } : { title: "7天窗口", sub: "7d" };
   }
-  if (provider === "codex") {
+  if (provider === "codex" || provider === "codex2") {
     // Codex may return only one window. Label it from its actual duration rather
     // than assuming that the first response field is always the 5-hour limit.
     if (windowMinutes != null && windowMinutes >= 10080) return { title: "7天窗口", sub: "7d" };

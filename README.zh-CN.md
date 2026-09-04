@@ -47,6 +47,7 @@ quota-dashboard/
 | **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | 余额（无窗口） |
 | **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/模型/routines 窗口 + extra 花费 |
 | **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d 窗口 + credits |
+| **Codex #2** | 同 Codex，独立槽位（第二个 ChatGPT 账号） | 同 Codex | 同 Codex |
 | **RightAPI** | account (`www.rightapi.ai/auth/me`) | user token | 余额（无窗口） |
 
 凭据获取方式见各 `providers/*.ts` 顶部注释。Claude/Codex 的 token 可从本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 复制粘贴。
