@@ -4,12 +4,12 @@ import { claudeDescriptor, codex2Descriptor, codexDescriptor, kimiDescriptor, mo
 
 // Key order drives dashboard card order.
 const DESCRIPTORS: Record<UsageProvider, ProviderDescriptor> = {
-  kimi: kimiDescriptor,
-  moonshot: moonshotDescriptor,
-  claude: claudeDescriptor,
   codex: codexDescriptor,
   codex2: codex2Descriptor,
+  claude: claudeDescriptor,
   rightapi: rightapiDescriptor,
+  kimi: kimiDescriptor,
+  moonshot: moonshotDescriptor,
 };
 
 export const ALL_PROVIDERS = Object.keys(DESCRIPTORS) as UsageProvider[];
