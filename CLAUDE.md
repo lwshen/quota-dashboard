@@ -13,9 +13,10 @@ pnpm dev                # next dev for @quota/web → http://localhost:3000
 pnpm build              # next build (standalone output)
 pnpm start              # run the standalone production server
 pnpm typecheck          # tsc --noEmit across all packages (pnpm -r typecheck)
+pnpm test               # offline core provider and HTTP transport tests (Node test runner)
 ```
 
-There is **no test suite and no linter/formatter configured** — `pnpm typecheck` is the only automated gate. Don't invent `test`/`lint` commands; if you add tests, wire up the tooling first.
+Core tests live in `packages/core/tests/*.test.cjs`. `pnpm test` compiles core to a temporary directory and runs Node's built-in test runner; no live credentials are needed. There is no linter/formatter configured. Run `pnpm typecheck` and relevant tests for provider changes.
 
 Before running locally, run `pnpm setup:env` (`scripts/setup-env.mjs`): it copies `apps/web/.env.example` → `apps/web/.env`, generates `APP_ENC_KEY` / `AUTH_SECRET` / `DASHBOARD_PASSWORD`, and sets `AUTH_DISABLED=true` so login is skipped. It never overwrites an existing `.env` unless given `--force` (which first writes a `.env.bak`). To do it by hand instead: copy the example and set `APP_ENC_KEY` (`openssl rand -hex 32`).
 
@@ -32,7 +33,7 @@ The browser cannot call the upstream usage endpoints directly (CORS, can't read 
 
 ### The provider pipeline (how data is fetched)
 
-Each provider is a **`ProviderDescriptor`** that resolves to an ordered list of **`ProviderFetchStrategy`**. `runPipeline` (`core/src/adapter.ts`) tries strategies in order, returns on first success, and only falls back to the next when `strategy.shouldFallback(err)` is true (typically only auth errors — see `isAuthError`). Results from any provider are normalized into the shared model in **`core/src/model.ts`**: `UsageSnapshot` (primary/secondary/tertiary `RateWindow` lanes + extras), where e.g. `RateWindow.usedPercent` is *used* (not remaining) and a spend `limit` of `0` means unlimited/unknown. Read `model.ts` before touching any provider — the field semantics are load-bearing and not obvious.
+Each provider is a **`ProviderDescriptor`** that resolves to an ordered list of **`ProviderFetchStrategy`**. `runPipeline` (`core/src/adapter.ts`) tries strategies in order, returns on first success, and only falls back to the next when `strategy.shouldFallback(err)` is true (typically only auth errors — see `isAuthError`). Results from any provider are normalized into the shared model in **`core/src/model.ts`**: `UsageSnapshot` (primary/secondary/tertiary `RateWindow` lanes + extras), where e.g. `RateWindow.usedPercent` is _used_ (not remaining) and a spend `limit` of `0` means unlimited/unknown. Read `model.ts` before touching any provider — the field semantics are load-bearing and not obvious.
 
 ### Adding a provider
 
@@ -58,7 +59,7 @@ UI and backend need no changes — credential form fields and card rendering are
 - **SSRF protection is two layers**: `core/src/net.ts` does synchronous literal checks (https-only, no userinfo, reject private/loopback/link-local/CGNAT/cloud-metadata IPs); `apps/web/lib/ssrf.ts` adds DNS resolution. Known limitation: the literal-only check at fetch time leaves a TOCTOU / DNS-rebinding gap (validation isn't pinned to the connecting IP).
 - **Auth is fail-closed**: if `DASHBOARD_PASSWORD` is unset, `middleware.ts` blocks everything. `AUTH_DISABLED=true` is local-dev only.
 - **Credentials are AES-256-GCM encrypted (`lib/crypto.ts`) and never returned to the frontend.** `APP_ENC_KEY` is the master key.
-- **Comment language**: code comments are English-only and kept minimal (explain *why*, not *what*). Note that user-facing UI text (in `.tsx`) is intentionally Chinese, and some thrown error-message strings are Chinese — these are product content, not comments; do not "translate" string literals when editing comments.
+- **Comment language**: code comments are English-only and kept minimal (explain _why_, not _what_). Note that user-facing UI text (in `.tsx`) is intentionally Chinese, and some thrown error-message strings are Chinese — these are product content, not comments; do not "translate" string literals when editing comments.
 
 ## Environment variables
 

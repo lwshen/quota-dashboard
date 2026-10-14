@@ -67,6 +67,13 @@ export function laneMeta(
   if (provider === "kimi") {
     return lane === "primary" ? { title: "周用量", sub: "Weekly" } : { title: "5小时速率", sub: "Rate" };
   }
+  if (provider === "grok") {
+    if (windowMinutes === 10080) return { title: "周用量", sub: "Weekly" };
+    if (windowMinutes != null && windowMinutes >= 28 * 1440 && windowMinutes <= 31 * 1440) {
+      return { title: "月用量", sub: "Monthly" };
+    }
+    return { title: "额度用量", sub: "Credits" };
+  }
   return lane === "primary" ? { title: "主窗口", sub: null } : { title: "次窗口", sub: null };
 }
 

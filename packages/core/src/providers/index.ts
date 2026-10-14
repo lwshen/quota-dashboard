@@ -3,3 +3,4 @@ export { moonshotDescriptor } from "./moonshot";
 export { claudeDescriptor } from "./claude";
 export { codex2Descriptor, codexDescriptor } from "./codex";
 export { rightapiDescriptor } from "./rightapi";
+export { grokDescriptor } from "./grok";

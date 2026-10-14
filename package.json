@@ -12,6 +12,7 @@
     "build": "pnpm --filter @quota/web build",
     "start": "pnpm --filter @quota/web start",
     "typecheck": "pnpm -r typecheck",
+    "test": "node scripts/test-core.mjs",
     "clean": "rm -rf apps/web/.next packages/core/dist node_modules apps/*/node_modules packages/*/node_modules"
   }
 }

@@ -17,6 +17,7 @@ const NOT_CONFIGURED = "未配置凭据";
 
 function costMain(cost: ProviderCostSnapshot): string {
   const ccy = cost.currencyCode ? ` ${cost.currencyCode}` : "";
+  if (cost.balance != null) return `${cost.balance.toFixed(2)}${ccy}`;
   // Balance-shaped cost (e.g. Codex credits): `limit` holds the available balance, used is 0.
   if (cost.limit > 0 && cost.used === 0 && /balance/i.test(cost.period ?? "")) {
     return `${cost.limit.toFixed(2)}${ccy}`;
@@ -114,11 +115,6 @@ export function ProviderCard({
             <RateWindowBar key={w.key} title={w.title} sub={w.sub} window={w.window} now={now} indeterminate={w.indeterminate} />
           ))}
           {loginText ? <div className="subident">{loginText}</div> : null}
-          {cost ? (
-            <div className="cost">
-              {cost.period ?? "额度"} · <span className="mono">{costMain(cost)}</span>
-            </div>
-          ) : null}
         </>
       ) : loginText ? (
         (() => {
@@ -145,6 +141,23 @@ export function ProviderCard({
               : "登录以查看 · sign in to view"}
         </div>
       )}
+
+      {s?.usageBreakdown?.length ? (
+        <div className="cost">
+          <div>用量明细 · Usage breakdown</div>
+          {s.usageBreakdown.map((product) => (
+            <div key={product.id} className="row" style={{ justifyContent: "space-between", marginTop: 4 }}>
+              <span>{product.title}</span>
+              <span className="mono">{Number(product.usedPercent.toFixed(2))}%</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {cost && (hasWindows || loginText) ? (
+        <div className="cost">
+          {cost.period ?? "额度"} · <span className="mono">{costMain(cost)}</span>
+        </div>
+      ) : null}
 
       <div className="stamp">
         {onConfigure ? (

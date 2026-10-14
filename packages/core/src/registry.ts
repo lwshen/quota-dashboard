@@ -1,12 +1,13 @@
 import type { ProviderDescriptor } from "./adapter";
 import type { UsageProvider } from "./model";
-import { claudeDescriptor, codex2Descriptor, codexDescriptor, kimiDescriptor, moonshotDescriptor, rightapiDescriptor } from "./providers";
+import { claudeDescriptor, codex2Descriptor, codexDescriptor, grokDescriptor, kimiDescriptor, moonshotDescriptor, rightapiDescriptor } from "./providers";
 
 // Key order drives dashboard card order.
 const DESCRIPTORS: Record<UsageProvider, ProviderDescriptor> = {
   codex: codexDescriptor,
   codex2: codex2Descriptor,
   claude: claudeDescriptor,
+  grok: grokDescriptor,
   rightapi: rightapiDescriptor,
   kimi: kimiDescriptor,
   moonshot: moonshotDescriptor,

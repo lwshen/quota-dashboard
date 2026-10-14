@@ -1,4 +1,4 @@
-export type UsageProvider = "claude" | "codex" | "codex2" | "kimi" | "moonshot" | "rightapi";
+export type UsageProvider = "claude" | "codex" | "codex2" | "grok" | "kimi" | "moonshot" | "rightapi";
 
 export type UsageDataConfidence = "exact" | "estimated" | "percentOnly" | "unknown";
 
@@ -30,6 +30,8 @@ export interface NamedRateWindow {
 
 export interface ProviderCostSnapshot {
   used: number;
+  /** Available wallet balance, separate from spend and quota limits. */
+  balance?: number | null;
   /** 0 means unlimited/unknown. */
   limit: number;
   currencyCode: string;
@@ -52,6 +54,8 @@ export interface UsageSnapshot {
   secondary: RateWindow | null;
   tertiary: RateWindow | null;
   extraRateWindows?: NamedRateWindow[] | null;
+  /** Shares of the primary credit pool, not independent quota windows. */
+  usageBreakdown?: { id: string; title: string; usedPercent: number }[] | null;
   providerCost?: ProviderCostSnapshot | null;
   identity?: ProviderIdentitySnapshot | null;
   dataConfidence: UsageDataConfidence;
