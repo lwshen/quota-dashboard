@@ -32,7 +32,7 @@ quota-dashboard/
 │     ├─ decode.ts         # Fault-tolerant decode helpers
 │     ├─ http.ts           # HttpClient abstraction + Node fetch implementation
 │     ├─ registry.ts       # Provider registry
-│     └─ providers/        # kimi / moonshot / claude / codex / rightapi
+│     └─ providers/        # kimi / moonshot / claude / codex / grok / rightapi
 └─ apps/web/               # Next.js dashboard + backend proxy
    ├─ app/                 # Pages + API routes
    ├─ components/          # ProviderCard / RateWindowBar / forms
@@ -41,16 +41,38 @@ quota-dashboard/
 
 ## Implemented providers
 
-| Provider | Path | Credentials | Output |
-|---|---|---|---|
-| **Kimi** | Code API (`api.kimi.com/coding/v1/usages`) | Bearer key | Weekly usage + 5h rate window |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`) | Bearer key | Balance (no window) |
-| **Claude** | OAuth usage (`api.anthropic.com/api/oauth/usage`) | access token (+refresh) | 5h/7d/model/routines windows + extra spend |
-| **Codex** | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d windows + credits |
-| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex | same as Codex |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`) | user token | Balance (no window) |
+| Provider     | Path                                                     | Credentials                          | Output                                                              |
+| ------------ | -------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- |
+| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)               | Bearer key                           | Weekly usage + 5h rate window                                       |
+| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                         | Bearer key                           | Balance (no window)                                                 |
+| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)        | access token (+refresh)              | 5h/7d/model/routines windows + extra spend                          |
+| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`)       | access token + account id (+refresh) | 5h/7d windows + credits                                             |
+| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex                        | same as Codex                                                       |
+| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback         | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance |
+| **RightAPI** | account (`www.rightapi.ai/auth/me`)                      | user token                           | Balance (no window)                                                 |
 
 See the comment at the top of each `providers/*.ts` for how to obtain credentials. Claude/Codex tokens can be copy-pasted from your local `~/.claude/.credentials.json` and `~/.codex/auth.json`.
+
+### Grok credentials and usage
+
+Run `grok login`, then copy the `key` for your account from `~/.grok/auth.json`
+(usually under `https://auth.x.ai::<client-id>`, or the legacy `https://accounts.x.ai/sign-in` entry).
+Select **Grok (SuperGrok 订阅)** in the credential form and paste it as the Access Token.
+The token is a subscription login credential, not an `xai-` API key. When it expires,
+run `grok login` again and update the saved token; the dashboard does not refresh Grok tokens.
+
+The implementation ports CodexBar's `GrokCreditsProxyFetcher`, `GrokWebBillingFetcher`,
+and OAuth strategy into this project's server-side HTTP pipeline:
+
+- Reads `https://cli-chat-proxy.grok.com/v1/billing?format=credits` with bearer auth and `x-xai-token-auth: xai-grok-cli`.
+- Tries Grok's `GetGrokCreditsConfig` gRPC-web endpoint with the same token if billing fails or omits usage. An optional lookup has a six-second timeout and cannot discard valid proxy metadata.
+- Displays missing usage as **unknown**, with any available reset time. A validated active gRPC period can establish an implicit zero.
+- Shows product shares as text under the total quota, only when the complete breakdown matches that response's aggregate. Prepaid balance is separate and converted from USD cents.
+
+This integration uses pasted tokens; it does not launch the Grok CLI, import browser cookies,
+scan local sessions, or fetch reset coupons. Adapted source attribution is in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+
+Run `pnpm test` for the offline provider and HTTP transport tests, and `pnpm typecheck` for both packages.
 
 ## Local development
 

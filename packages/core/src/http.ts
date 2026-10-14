@@ -13,6 +13,8 @@ export interface HttpResponse {
   status: number;
   headers: Record<string, string>;
   body: string;
+  /** Original bytes for binary protocols such as gRPC-web. */
+  bodyBytes?: Uint8Array;
 }
 
 export interface HttpClient {
@@ -78,12 +80,13 @@ async function once(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { method, headers, body, signal: controller.signal, redirect: "follow" });
-    const text = await res.text();
+    const bodyBytes = new Uint8Array(await res.arrayBuffer());
+    const text = new TextDecoder().decode(bodyBytes);
     const h: Record<string, string> = {};
     res.headers.forEach((v, k) => {
       h[k.toLowerCase()] = v;
     });
-    return { status: res.status, headers: h, body: text };
+    return { status: res.status, headers: h, body: text, bodyBytes };
   } finally {
     clearTimeout(timer);
   }
