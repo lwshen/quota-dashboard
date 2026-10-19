@@ -4,6 +4,7 @@ import { getDescriptor, isProvider } from "@quota/core";
 import { deleteCredential, listCredentials, saveCredential } from "@/lib/store";
 import { fetchAndStore } from "@/lib/fetcher";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
+import { normalizeGrokCredentials } from "@quota/core/grok-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
   const mode = (body.mode as SourceMode) ?? "auto";
   const fields = body.fields ?? {};
 
-  const creds: ProviderCredentials = {};
+  let creds: ProviderCredentials = {};
   const extra: Record<string, string> = {};
   for (const f of desc.credentialFields) {
     const val = fields[f.key];
@@ -52,6 +53,12 @@ export async function POST(req: Request) {
     }
   }
   if (Object.keys(extra).length) creds.extra = extra;
+
+  if (provider === "grok") {
+    try { creds = normalizeGrokCredentials(creds); } catch (error) {
+      return NextResponse.json({ error: error instanceof Error ? error.message : "Grok 凭据格式不正确" }, { status: 400 });
+    }
+  }
 
   // SSRF: baseUrlOverride must be a public https URL.
   if (creds.baseUrlOverride) {

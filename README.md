@@ -58,8 +58,24 @@ See the comment at the top of each `providers/*.ts` for how to obtain credential
 Run `grok login`, then copy the `key` for your account from `~/.grok/auth.json`
 (usually under `https://auth.x.ai::<client-id>`, or the legacy `https://accounts.x.ai/sign-in` entry).
 Select **Grok (SuperGrok 订阅)** in the credential form and paste it as the Access Token.
-The token is a subscription login credential, not an `xai-` API key. When it expires,
-run `grok login` again and update the saved token; the dashboard does not refresh Grok tokens.
+The token is a subscription login credential, not an `xai-` API key. Import `auth.json`
+in the form to fill the access token, refresh token, client ID, and expiry automatically,
+or enter them manually. Files are parsed in the browser; only the selected account's
+required credential fields are submitted. Files containing multiple accounts require a selection.
+
+With a refresh token and client ID, usage polling renews credentials through
+`https://auth.x.ai/oauth2/token` when fewer than ten minutes remain. A 401 also triggers
+one renewal and usage retry. Rotated tokens and the server-provided expiry are saved
+together using the existing encryption. Access-token-only credentials remain supported
+but require manual replacement when expired. Lifetimes come from the issued token,
+not a fixed six-hour or seven-day assumption.
+
+Use one refresh owner per login session: the CLI and dashboard must not independently
+rotate the same refresh token. Importing creates a dashboard-managed copy; it neither
+writes back to `auth.json` nor follows later CLI changes. Prefer a login session managed
+exclusively by the dashboard. `invalid_grant` / `invalid_client` pauses renewal until
+credentials are replaced; network failures and rate limits back off, while unexpired
+access tokens can still supply usage.
 
 The implementation ports CodexBar's `GrokCreditsProxyFetcher`, `GrokWebBillingFetcher`,
 and OAuth strategy into this project's server-side HTTP pipeline:
@@ -69,8 +85,10 @@ and OAuth strategy into this project's server-side HTTP pipeline:
 - Displays missing usage as **unknown**, with any available reset time. A validated active gRPC period can establish an implicit zero.
 - Shows product shares as text under the total quota, only when the complete breakdown matches that response's aggregate. Prepaid balance is separate and converted from USD cents.
 
-This integration uses pasted tokens; it does not launch the Grok CLI, import browser cookies,
+This integration does not launch the Grok CLI, import browser cookies,
 scan local sessions, or fetch reset coupons. Adapted source attribution is in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+Polling and manual requests share in-flight work within one server process. Run a single
+instance so separate processes cannot rotate the same credential concurrently.
 
 Run `pnpm test` for the offline provider and HTTP transport tests, and `pnpm typecheck` for both packages.
 

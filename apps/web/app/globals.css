@@ -46,7 +46,8 @@ body {
   --claude: #c15f3c;
   --openai: #0f9d63;
   --track: #eaecf0;
-  --shadow: 0 1px 2px rgba(20, 24, 32, 0.06), 0 10px 26px rgba(20, 24, 32, 0.08);
+  --shadow:
+    0 1px 2px rgba(20, 24, 32, 0.06), 0 10px 26px rgba(20, 24, 32, 0.08);
 }
 
 body {
@@ -99,7 +100,9 @@ body {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font: 700 15px var(--font-jetbrains-mono), monospace;
+  font:
+    700 15px var(--font-jetbrains-mono),
+    monospace;
   flex: none;
 }
 
@@ -127,7 +130,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font: 500 11px var(--font-jetbrains-mono), monospace;
+  font:
+    500 11px var(--font-jetbrains-mono),
+    monospace;
   color: var(--good);
 }
 
@@ -164,7 +169,9 @@ body {
   gap: 6px;
   padding: 8px 13px;
   border-radius: 9px;
-  font: 500 12px var(--font-space-grotesk), sans-serif;
+  font:
+    500 12px var(--font-space-grotesk),
+    sans-serif;
   cursor: pointer;
   user-select: none;
   border: 1px solid var(--border);
@@ -239,7 +246,9 @@ body {
   gap: 5px;
   padding: 3px 9px;
   border-radius: 999px;
-  font: 600 10px var(--font-jetbrains-mono), monospace;
+  font:
+    600 10px var(--font-jetbrains-mono),
+    monospace;
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
@@ -398,7 +407,9 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font: 400 9px var(--font-jetbrains-mono), monospace;
+  font:
+    400 9px var(--font-jetbrains-mono),
+    monospace;
   color: var(--faint);
 }
 
@@ -442,7 +453,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 12px var(--font-space-grotesk), sans-serif;
+  font:
+    600 12px var(--font-space-grotesk),
+    sans-serif;
   flex: none;
 }
 
@@ -519,6 +532,8 @@ body {
 .modal {
   width: 100%;
   max-width: 380px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -553,7 +568,9 @@ body {
   border: 1px solid var(--border);
   background: var(--panel2);
   color: var(--text);
-  font: 400 13px var(--font-space-grotesk), sans-serif;
+  font:
+    400 13px var(--font-space-grotesk),
+    sans-serif;
   outline: none;
   margin-top: 9px;
 }
@@ -595,7 +612,9 @@ select.field {
   border: none;
   background: var(--text);
   color: var(--bg);
-  font: 600 13px var(--font-space-grotesk), sans-serif;
+  font:
+    600 13px var(--font-space-grotesk),
+    sans-serif;
   cursor: pointer;
   margin-top: 16px;
 }
@@ -616,7 +635,9 @@ select.field {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text);
-  font: 500 12.5px var(--font-space-grotesk), sans-serif;
+  font:
+    500 12.5px var(--font-space-grotesk),
+    sans-serif;
   cursor: pointer;
   margin-top: 9px;
   display: flex;
