@@ -1,5 +1,5 @@
-import type { FetchContext, HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
-import { getDescriptor, nodeHttpClient, runPipeline, UnauthorizedError } from "@quota/core";
+import type { HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
+import { createUsageFetcher, nodeHttpClient } from "@quota/core";
 import { ENV } from "./env";
 import { detectAndNotifyResets } from "./notify";
 import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "./store";
@@ -23,43 +23,17 @@ function debugHttpClient(provider: UsageProvider): HttpClient {
   };
 }
 
-export async function fetchAndStore(provider: UsageProvider): Promise<FetchResult> {
-  const now = new Date();
-  const stored = getCredential(provider);
-  if (!stored || !stored.enabled) {
-    return { snapshot: null, error: "未配置凭据" };
-  }
-  const desc = getDescriptor(provider);
-  let creds = stored.credentials;
-  const ctx: FetchContext = { now, http: debugHttpClient(provider), cachedSnapshot: null };
-
-  try {
-    const snap = await runPipeline(desc, stored.mode, creds, ctx);
-    // Before saveSnapshot: reset detection compares against the last stored good snapshot.
-    detectAndNotifyResets(provider, snap, now);
-    saveSnapshot(provider, snap, null, now);
-    return { snapshot: snap, error: null };
-  } catch (e) {
-    if (e instanceof UnauthorizedError && desc.refresh && creds.refreshToken) {
-      try {
-        const refreshed = await desc.refresh(creds, ctx);
-        creds = refreshed.credentials;
-        updateCredentialSecret(provider, creds, now);
-        const snap = await runPipeline(desc, stored.mode, creds, ctx);
-        detectAndNotifyResets(provider, snap, now);
-        saveSnapshot(provider, snap, null, now);
-        return { snapshot: snap, error: null };
-      } catch (e2) {
-        const msg = e2 instanceof Error ? e2.message : String(e2);
-        saveSnapshot(provider, null, `刷新后仍失败: ${msg}`, now);
-        return { snapshot: null, error: msg };
-      }
-    }
-    const msg = e instanceof Error ? e.message : String(e);
-    saveSnapshot(provider, null, msg, now);
-    return { snapshot: null, error: msg };
-  }
-}
+// Route handlers and instrumentation may load separate copies of this module.
+const processState = globalThis as typeof globalThis & { quotaUsageFetcher?: ReturnType<typeof createUsageFetcher> };
+export const fetchAndStore = processState.quotaUsageFetcher ??= createUsageFetcher({
+  load: getCredential,
+  update: updateCredentialSecret,
+  http: debugHttpClient,
+  publish(provider, snapshot, error, now) {
+    if (snapshot) detectAndNotifyResets(provider, snapshot, now);
+    saveSnapshot(provider, snapshot, error, now);
+  },
+});
 
 export async function fetchAllConfigured(): Promise<void> {
   const creds = listCredentials().filter((c) => c.enabled);

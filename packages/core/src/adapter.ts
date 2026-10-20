@@ -15,6 +15,13 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class RefreshRejectedError extends UnauthorizedError {
+  constructor(msg = "刷新凭据已失效，请重新登录并更新凭据") {
+    super(msg);
+    this.name = "RefreshRejectedError";
+  }
+}
+
 export class RateLimitedError extends Error {
   retryAfterSeconds?: number;
   constructor(retryAfterSeconds?: number, msg = "rate limited") {
@@ -46,6 +53,12 @@ export interface ProviderCredentials {
   /** ISO8601. */
   expiresAt?: string | null;
   extra?: Record<string, string>;
+  refreshState?: {
+    blocked?: boolean;
+    retryAt?: string;
+    failures?: number;
+    error?: string;
+  };
 }
 
 export interface FetchContext {
@@ -89,6 +102,7 @@ export interface ProviderDescriptor {
   producesRateWindows: boolean;
   resolveStrategies(mode: SourceMode): ProviderFetchStrategy[];
   refresh?(creds: ProviderCredentials, ctx: FetchContext): Promise<RefreshResult>;
+  refreshLeadTimeMs?: number;
 }
 
 export async function runPipeline(

@@ -8,6 +8,7 @@ export interface StoredCredential {
   mode: SourceMode;
   credentials: ProviderCredentials;
   updatedAt: string;
+  revision: string;
 }
 
 interface CredentialRow {
@@ -25,6 +26,7 @@ function rowToCredential(r: CredentialRow): StoredCredential {
     mode: r.mode as SourceMode,
     credentials: JSON.parse(decrypt(r.data)) as ProviderCredentials,
     updatedAt: r.updated_at,
+    revision: r.data,
   };
 }
 
@@ -42,10 +44,12 @@ export function saveCredential(provider: UsageProvider, mode: SourceMode, creds:
   db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
 }
 
-export function updateCredentialSecret(provider: UsageProvider, creds: ProviderCredentials, now: Date): void {
-  db()
-    .prepare(`UPDATE credentials SET data=?, updated_at=? WHERE provider=?`)
-    .run(encrypt(JSON.stringify(creds)), now.toISOString(), provider);
+export function updateCredentialSecret(provider: UsageProvider, creds: ProviderCredentials, now: Date, revision: string): string | null {
+  const data = encrypt(JSON.stringify(creds));
+  const result = db()
+    .prepare(`UPDATE credentials SET data=?, updated_at=? WHERE provider=? AND data=?`)
+    .run(data, now.toISOString(), provider, revision);
+  return result.changes === 1 ? data : null;
 }
 
 export function deleteCredential(provider: UsageProvider): void {

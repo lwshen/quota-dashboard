@@ -58,8 +58,19 @@ quota-dashboard/
 先运行 `grok login`，再从 `~/.grok/auth.json` 复制对应账户的 `key`
 （通常位于 `https://auth.x.ai::<client-id>` 下，旧版位于 `https://accounts.x.ai/sign-in`）。
 在凭据表单中选择 **Grok (SuperGrok 订阅)**，将其粘贴到 Access Token。
-这里需要订阅登录 Token，不是 `xai-` API Key。Token 过期后需重新运行 `grok login`
-并更新保存的 Token；看板不自动刷新 Grok Token。
+这里需要订阅登录 Token，不是 `xai-` API Key。可在表单中直接导入 `auth.json`，
+自动填写 Access Token、Refresh Token、Client ID 和过期时间；多个账户时需选择一个。
+文件在浏览器内解析，只提交所选账户续期需要的字段。也可以手动填写。
+
+提供 Refresh Token 和 Client ID 后，看板会在用量轮询发现 Token 剩余不足 10 分钟时，
+通过 `https://auth.x.ai/oauth2/token` 自动续期；401 时补做一次续期并重试用量查询。
+新的 Access Token、Refresh Token 和服务端过期时间会一起加密保存。只填 Access Token
+仍可查询，但过期后需要手动更新。过期时间以实际签发值为准，不固定为 6 小时或 7 天。
+
+登录凭据应由一处管理续期：不要让 Grok CLI 和看板同时刷新同一份会轮换的 Refresh Token。
+导入后，看板维护数据库中的副本，不回写本机 `auth.json`，不会跟随 CLI 的后续凭据更新。
+建议使用由看板独立管理的登录会话。明确的 `invalid_grant` / `invalid_client` 会停止自动续期，
+需重新登录并导入；网络错误和限流会退避重试，已有未过期 Token 仍会用于用量查询。
 
 实现参考 CodexBar 的 `GrokCreditsProxyFetcher`、`GrokWebBillingFetcher` 和 OAuth 策略，接入本项目服务端 HTTP 管线：
 
@@ -68,7 +79,8 @@ quota-dashboard/
 - 缺少百分比时显示**未知**，保留已知重置时间；仅完整、有效的 gRPC 当前周期可以确认隐式零用量。
 - 产品用量是总额度的组成部分，以文本展示；只有完整明细与同一响应的总用量吻合时才显示。预付余额独立展示，由美分换算为美元。
 
-此接入使用手动粘贴的 Token，不启动 Grok CLI、不导入浏览器 Cookie、不扫描本地会话，也不获取重置券。
+此接入不启动 Grok CLI、不导入浏览器 Cookie、不扫描本地会话，也不获取重置券。
+同一服务进程内，轮询和手动刷新会合并请求；请保持单实例运行，避免多个实例同时轮换同一凭据。
 移植代码的来源与许可证见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
 可运行 `pnpm test` 验证离线 Provider 和 HTTP 传输测试，运行 `pnpm typecheck` 检查两个包的类型。
