@@ -83,8 +83,7 @@ exclusively by the dashboard. `invalid_grant` / `invalid_client` pauses renewal 
 credentials are replaced; network failures and rate limits back off, while unexpired
 access tokens can still supply usage.
 
-The implementation ports CodexBar's `GrokCreditsProxyFetcher`, `GrokWebBillingFetcher`,
-and OAuth strategy into this project's server-side HTTP pipeline:
+The server-side HTTP pipeline reads subscription usage through these billing endpoints:
 
 - Reads `https://cli-chat-proxy.grok.com/v1/billing?format=credits` with bearer auth and `x-xai-token-auth: xai-grok-cli`.
 - Tries Grok's `GetGrokCreditsConfig` gRPC-web endpoint with the same token if billing fails or omits usage. An optional lookup has a six-second timeout and cannot discard valid proxy metadata.

@@ -1,4 +1,4 @@
-// Port of CodexBar's Grok OAuth billing path. Paste the `key` from ~/.grok/auth.json.
+// Subscription billing path. Paste the `key` from ~/.grok/auth.json.
 // Refresh uses the official CLI's OIDC form grant; xai-* keys cannot read subscription usage.
 import type { FetchContext, ProviderDescriptor, ProviderFetchStrategy } from "../adapter";
 import { RateLimitedError, RefreshRejectedError, UnauthorizedError, UpstreamError } from "../adapter";

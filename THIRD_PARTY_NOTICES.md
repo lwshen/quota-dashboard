@@ -1,18 +1,7 @@
-# CodexBar
+# Third-party notices
 
-The Grok billing implementation in `packages/core/src/providers/grok*.ts` and
-related test cases are adapted from CodexBar's GrokCreditsProxyFetcher,
-GrokWebBillingFetcher, GrokProtobufField, GrokPlan, GrokCredentialRouting,
-GrokProviderDescriptor, and their tests.
-
-The Kimi ratio/count reconciliation, Claude scoped weekly limits, Codex Spark
-windows and credit-limit mapping, and related regression tests are also adapted
-from CodexBar's KimiUsageSnapshot, KimiRatioPoolTests,
-KimiContradictoryUsageTests, ClaudeScopedWeeklyLimitMapper,
-CodexAdditionalRateLimitMapper, CodexSpendControlLimitMapping,
-CodexSpendControlsMonthlyUsage, CodexExtraUsageCost, and CodexTokenRefresher.
-
-Source: https://github.com/steipete/CodexBar
+Portions of the Grok, Kimi, Claude, and Codex provider implementations and related
+tests are adapted from third-party code distributed under the following license.
 
 MIT License
 

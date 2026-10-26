@@ -78,7 +78,7 @@ Claude 和两个 Codex 槽位均识别永久 OAuth 续期失败，包括嵌套�
 建议使用由看板独立管理的登录会话。明确的 `invalid_grant` / `invalid_client` 会停止自动续期，
 需重新登录并导入；网络错误和限流会退避重试，已有未过期 Token 仍会用于用量查询。
 
-实现参考 CodexBar 的 `GrokCreditsProxyFetcher`、`GrokWebBillingFetcher` 和 OAuth 策略，接入本项目服务端 HTTP 管线：
+通过服务端 HTTP 管线读取订阅用量：
 
 - 使用 Bearer Token 和 `x-xai-token-auth: xai-grok-cli` 请求 `https://cli-chat-proxy.grok.com/v1/billing?format=credits`。
 - 账单请求失败或缺少用量时，以同一 Token 尝试 Grok 的 `GetGrokCreditsConfig` gRPC-web 接口。可选补充查询超时为 6 秒，失败不丢弃已有周期、套餐和余额。
