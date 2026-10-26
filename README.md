@@ -91,7 +91,7 @@ The server-side HTTP pipeline reads subscription usage through these billing end
 - Shows product shares as text under the total quota, only when the complete breakdown matches that response's aggregate. Prepaid balance is separate and converted from USD cents.
 
 This integration does not launch the Grok CLI, import browser cookies,
-scan local sessions, or fetch reset coupons. Adapted source attribution is in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+scan local sessions, or fetch reset coupons. Third-party licensing is covered in the [license notice](#third-party-license).
 Polling and manual requests share in-flight work within one server process. Run a single
 instance so separate processes cannot rotate the same credential concurrently.
 
@@ -186,3 +186,30 @@ No UI or backend changes are needed — form fields and card rendering are drive
 - Storage uses **better-sqlite3 directly + hand-written SQL** (minimal dependencies, no migration tooling); if you need typed queries / migrations you can layer on Drizzle.
 - Historical snapshots are already persisted to the `snapshot_history` table (`historyFor` in `store.ts`), which you can use to add a used-% history chart.
 - The cookie-scraping paths (claude.ai / chatgpt.com web, Kimi web) are not included in this scaffold — see the upstream report; they are the most fragile and most ToS-sensitive tier, add them as needed.
+
+## Third-party license
+
+Portions of the Grok, Kimi, Claude, and Codex provider implementations and related
+tests are adapted from third-party code distributed under the following license.
+
+MIT License
+
+Copyright (c) 2026 Peter Steinberger
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

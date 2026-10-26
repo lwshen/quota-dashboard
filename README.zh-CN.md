@@ -87,7 +87,7 @@ Claude 和两个 Codex 槽位均识别永久 OAuth 续期失败，包括嵌套�
 
 此接入不启动 Grok CLI、不导入浏览器 Cookie、不扫描本地会话，也不获取重置券。
 同一服务进程内，轮询和手动刷新会合并请求；请保持单实例运行，避免多个实例同时轮换同一凭据。
-移植代码的来源与许可证见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
+移植代码的版权与许可证见 [许可声明](./README.md#third-party-license)。
 
 可运行 `pnpm test` 验证离线 Provider、OAuth、HTTP 传输和卡片渲染测试，运行 `pnpm typecheck` 检查两个包的类型。
 
