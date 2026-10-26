@@ -1,4 +1,4 @@
-// CodexBar's GrokWebBillingFetcher wire contract, limited to the billing read endpoint.
+// Grok gRPC-web wire contract, limited to the billing read endpoint.
 import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
 import type { GrokBilling } from "./grok-billing";
 import { periodMinutes, productShares } from "./grok-billing";

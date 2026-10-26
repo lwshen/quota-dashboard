@@ -85,6 +85,7 @@ export function createUsageFetcher(deps: Dependencies): (provider: UsageProvider
 
     try {
       assertCurrent();
+      if (current.credentials.refreshState?.blocked) throw new RefreshRejectedError(current.credentials.refreshState.error);
       if (desc.refresh && current.credentials.refreshToken && desc.refreshLeadTimeMs != null
         && expiry() <= now().getTime() + desc.refreshLeadTimeMs) {
         try {

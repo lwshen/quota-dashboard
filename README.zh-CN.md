@@ -41,17 +41,23 @@ quota-dashboard/
 
 ## 已实现的 provider
 
-| Provider     | 路径                                               | 凭据                                 | 产出                                         |
-| ------------ | -------------------------------------------------- | ------------------------------------ | -------------------------------------------- |
-| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                           | 周用量 + 5h 速率窗口                         |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | 余额（无窗口）                               |
-| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/模型/routines 窗口 + extra 花费        |
-| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d 窗口 + credits                         |
-| **Codex #2** | 同 Codex，独立槽位（第二个 ChatGPT 账号）          | 同 Codex                             | 同 Codex                                     |
-| **Grok**     | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                | 额度用量、重置时间、产品明细、套餐及预付余额 |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | 余额（无窗口）                               |
+| Provider     | 路径                                               | 凭据                                 | 产出                                          |
+| ------------ | -------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
+| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                           | 周/会话配额 + 月总量，兼容比例与旧计数格式    |
+| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | 余额（无窗口）                                |
+| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/全部模型/routines 窗口 + extra 花费     |
+| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d/Spark 窗口 + Credits 余额与工作区月额度 |
+| **Codex #2** | 同 Codex，独立槽位（第二个 ChatGPT 账号）          | 同 Codex                             | 同 Codex                                      |
+| **Grok**     | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                | 额度用量、重置时间、产品明细、套餐及预付余额  |
+| **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | 余额（无窗口）                                |
 
 凭据获取方式见各 `providers/*.ts` 顶部注释。Claude/Codex 的 token 可从本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 复制粘贴。
+
+Kimi 会话窗口按 API 实际时长显示，各窗口独立标记未知用量。Claude 模型周限额即使报告 `is_active=false` 也会显示，并按模型身份区分配额，避免误判重置。
+
+Codex 额度使用原生 **Credits** 单位，同时展示月额度和独立购买的余额，不重复计算接口返回的同一月额度剩余值。如果工作区报告 spend controls 却没有可用月额度，则追加同账户的月用量查询，最多等待 6 秒；该可选查询失败不会影响主配额和余额。
+
+Claude 和两个 Codex 槽位均识别永久 OAuth 续期失败，包括嵌套错误码。凭据被拒绝后暂停使用，替换凭据后恢复；临时故障仍按原有策略退避重试。成功续期时保存轮换后的 token 和服务端提供的有效期，Codex 不再假定固定 8 天有效期。
 
 ### Grok 凭据与用量
 
@@ -72,7 +78,7 @@ quota-dashboard/
 建议使用由看板独立管理的登录会话。明确的 `invalid_grant` / `invalid_client` 会停止自动续期，
 需重新登录并导入；网络错误和限流会退避重试，已有未过期 Token 仍会用于用量查询。
 
-实现参考 CodexBar 的 `GrokCreditsProxyFetcher`、`GrokWebBillingFetcher` 和 OAuth 策略，接入本项目服务端 HTTP 管线：
+通过服务端 HTTP 管线读取订阅用量：
 
 - 使用 Bearer Token 和 `x-xai-token-auth: xai-grok-cli` 请求 `https://cli-chat-proxy.grok.com/v1/billing?format=credits`。
 - 账单请求失败或缺少用量时，以同一 Token 尝试 Grok 的 `GetGrokCreditsConfig` gRPC-web 接口。可选补充查询超时为 6 秒，失败不丢弃已有周期、套餐和余额。
@@ -81,9 +87,8 @@ quota-dashboard/
 
 此接入不启动 Grok CLI、不导入浏览器 Cookie、不扫描本地会话，也不获取重置券。
 同一服务进程内，轮询和手动刷新会合并请求；请保持单实例运行，避免多个实例同时轮换同一凭据。
-移植代码的来源与许可证见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。
 
-可运行 `pnpm test` 验证离线 Provider 和 HTTP 传输测试，运行 `pnpm typecheck` 检查两个包的类型。
+可运行 `pnpm test` 验证离线 Provider、OAuth、HTTP 传输和卡片渲染测试，运行 `pnpm typecheck` 检查两个包的类型。
 
 ## 本地运行
 

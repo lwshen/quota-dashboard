@@ -1,6 +1,6 @@
-import type { ProviderCostSnapshot, UsageSnapshot } from "@quota/core";
+import type { UsageSnapshot } from "@quota/core";
 import { RateWindowBar } from "./RateWindowBar";
-import { computeBadge, laneMeta, parseValueBlock, splitLabel } from "@/lib/format";
+import { computeBadge, formatCost, laneMeta, parseValueBlock, splitLabel } from "@/lib/format";
 
 export interface ProviderView {
   provider: string;
@@ -14,18 +14,6 @@ export interface ProviderView {
 
 // The exact string fetchAndStore stores when no credential is configured.
 const NOT_CONFIGURED = "未配置凭据";
-
-function costMain(cost: ProviderCostSnapshot): string {
-  const ccy = cost.currencyCode ? ` ${cost.currencyCode}` : "";
-  if (cost.balance != null) return `${cost.balance.toFixed(2)}${ccy}`;
-  // Balance-shaped cost (e.g. Codex credits): `limit` holds the available balance, used is 0.
-  if (cost.limit > 0 && cost.used === 0 && /balance/i.test(cost.period ?? "")) {
-    return `${cost.limit.toFixed(2)}${ccy}`;
-  }
-  if (cost.limit > 0) return `${cost.used.toFixed(2)} / ${cost.limit.toFixed(2)}${ccy}`;
-  // limit === 0 means unlimited/unknown cap (per model.ts) — keep the ∞ affordance.
-  return cost.used > 0 ? `${cost.used.toFixed(2)} / ∞${ccy}` : `∞${ccy}`;
-}
 
 export function ProviderCard({
   view,
@@ -42,9 +30,9 @@ export function ProviderCard({
   const { name, tag } = splitLabel(view.label);
   const accent = view.accentColor ?? "var(--faint)";
 
-  // Main lanes carry trustworthy usage only when the snapshot confidence says so; e.g. Kimi
-  // reports dataConfidence "percentOnly" with a coerced 0% when the weekly limit is unknown.
+  // New snapshots report confidence per window; retain the aggregate fallback for older data.
   const mainTrusted = s?.dataConfidence === "exact" || s?.dataConfidence === "estimated";
+  const trusted = (window: NonNullable<UsageSnapshot["primary"]>) => window.usageKnown ?? mainTrusted;
   const windows: {
     key: string;
     title: string;
@@ -53,11 +41,11 @@ export function ProviderCard({
     indeterminate: boolean;
   }[] = [];
   if (s?.primary)
-    windows.push({ key: "primary", ...laneMeta(view.provider, "primary", s.primary.windowMinutes), window: s.primary, indeterminate: !mainTrusted });
+    windows.push({ key: "primary", ...laneMeta(view.provider, "primary", s.primary.windowMinutes), window: s.primary, indeterminate: !trusted(s.primary) });
   if (s?.secondary)
-    windows.push({ key: "secondary", ...laneMeta(view.provider, "secondary", s.secondary.windowMinutes), window: s.secondary, indeterminate: !mainTrusted });
+    windows.push({ key: "secondary", ...laneMeta(view.provider, "secondary", s.secondary.windowMinutes), window: s.secondary, indeterminate: !trusted(s.secondary) });
   if (s?.tertiary)
-    windows.push({ key: "tertiary", ...laneMeta(view.provider, "tertiary", s.tertiary.windowMinutes), window: s.tertiary, indeterminate: !mainTrusted });
+    windows.push({ key: "tertiary", ...laneMeta(view.provider, "tertiary", s.tertiary.windowMinutes), window: s.tertiary, indeterminate: !trusted(s.tertiary) });
   // NamedRateWindow.usageKnown === false means "show reset metadata, not real consumption".
   for (const e of s?.extraRateWindows ?? []) {
     windows.push({ key: `x-${e.id}`, title: e.title, sub: null, window: e.window, indeterminate: e.usageKnown === false });
@@ -130,7 +118,7 @@ export function ProviderCard({
       ) : cost ? (
         <div className="valblock">
           <div className="vlbl">{cost.period ?? "额度 · Cost"}</div>
-          <div className="vval mono">{costMain(cost)}</div>
+          <div className="vval mono">{formatCost(cost)}</div>
         </div>
       ) : (
         <div className="emptystate">
@@ -155,7 +143,7 @@ export function ProviderCard({
       ) : null}
       {cost && (hasWindows || loginText) ? (
         <div className="cost">
-          {cost.period ?? "额度"} · <span className="mono">{costMain(cost)}</span>
+          {cost.period ?? "额度"} · <span className="mono">{formatCost(cost)}</span>
         </div>
       ) : null}
 

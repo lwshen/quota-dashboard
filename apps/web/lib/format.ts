@@ -1,5 +1,17 @@
 // Pure UI formatting helpers shared by the dashboard client components.
 // No server-only imports here — this module is bundled into the browser.
+import type { ProviderCostSnapshot } from "@quota/core";
+
+export function formatCost(cost: ProviderCostSnapshot): string {
+  const unit = cost.currencyCode ? ` ${cost.currencyCode}` : "";
+  const balance = cost.balance != null ? `${cost.balance.toFixed(2)}${unit}` : null;
+  const cap = cost.limit > 0 ? `${cost.used.toFixed(2)} / ${cost.limit.toFixed(2)}${unit}` : null;
+  // Older stored snapshots used limit for the balance; preserve their display until the next poll.
+  if (balance == null && cost.used === 0 && /balance/i.test(cost.period ?? "")) return `${cost.limit.toFixed(2)}${unit}`;
+  if (cap) return balance != null ? `${cap} · 余额 ${balance}` : cap;
+  if (balance != null) return balance;
+  return cost.used > 0 ? `${cost.used.toFixed(2)} / ∞${unit}` : `∞${unit}`;
+}
 
 export type BadgeTone = "good" | "warn" | "danger" | "muted";
 
@@ -65,7 +77,10 @@ export function laneMeta(
     return lane === "primary" ? { title: "主窗口", sub: null } : { title: "次窗口", sub: null };
   }
   if (provider === "kimi") {
-    return lane === "primary" ? { title: "周用量", sub: "Weekly" } : { title: "5小时速率", sub: "Rate" };
+    if (lane === "primary") return { title: "周用量", sub: "Weekly" };
+    const duration = windowMinutes != null && windowMinutes > 0
+      ? windowMinutes % 60 === 0 ? `${windowMinutes / 60}小时` : `${windowMinutes}分钟` : "";
+    return { title: `${duration}速率`, sub: "Rate" };
   }
   if (provider === "grok") {
     if (windowMinutes === 10080) return { title: "周用量", sub: "Weekly" };

@@ -2,9 +2,10 @@
 // Token refresh uses a different host (platform.claude.com, not api.anthropic.com).
 
 import type { FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
-import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
+import { RateLimitedError, RefreshRejectedError, UnauthorizedError, UpstreamError } from "../adapter";
 import type { NamedRateWindow, ProviderCostSnapshot, RateWindow, UsageSnapshot } from "../model";
-import { clampPercent, num, parseIsoOrUnix, pick, retryAfterSeconds, safeJson } from "../decode";
+import { asRecord, clampPercent, nonEmptyString, num, parseIsoOrUnix, pick, retryAfterSeconds, safeJson, slug } from "../decode";
+import { decodeRefreshResponse } from "./oauth-refresh";
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 const TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
@@ -36,22 +37,25 @@ function windowFrom(node: unknown, windowMinutes: number | null): RateWindow | n
   };
 }
 
-/** The `limits` array carries the currently active model-scoped weekly limit. */
-function activeScopedWindow(limits: unknown): { title: string; window: RateWindow } | null {
-  if (!Array.isArray(limits)) return null;
-  const scoped = limits.find((item) => {
-    if (!item || typeof item !== "object") return false;
-    const limit = item as Record<string, unknown>;
-    return limit.kind === "weekly_scoped" && limit.is_active === true;
-  }) as Record<string, unknown> | undefined;
-  if (!scoped) return null;
-
-  const window = windowFrom(scoped, 10080);
-  if (!window) return null;
-  const scope = scoped.scope as Record<string, unknown> | null;
-  const model = scope?.model as Record<string, unknown> | null;
-  const displayName = typeof model?.display_name === "string" ? model.display_name.trim() : "";
-  return { title: displayName ? `${displayName} (7d)` : "模型窗口 (7d)", window };
+function scopedWindows(limits: unknown): NamedRateWindow[] {
+  if (!Array.isArray(limits)) return [];
+  const seen = new Set<string>();
+  const windows: NamedRateWindow[] = [];
+  for (const item of limits) {
+    const limit = asRecord(item);
+    if (limit?.kind !== "weekly_scoped" || limit.group !== "weekly") continue;
+    const model = asRecord(asRecord(limit.scope)?.model);
+    const name = nonEmptyString(model?.display_name);
+    const modelID = nonEmptyString(model?.id);
+    const window = windowFrom(limit, 10080);
+    if (!window || !name || slug(name) === "all-models" || /(^|-)all-models$/.test(slug(modelID ?? ""))) continue;
+    const identity = slug(modelID ?? name);
+    if (!identity || seen.has(identity)) continue;
+    seen.add(identity);
+    // Enforceable scoped limits can report is_active=false.
+    windows.push({ id: `claude-weekly-scoped-${identity}`, title: `${name} (7d)`, window, usageKnown: true });
+  }
+  return windows;
 }
 
 const claudeOAuthStrategy: ProviderFetchStrategy = {
@@ -92,8 +96,7 @@ const claudeOAuthStrategy: ProviderFetchStrategy = {
     const extra: NamedRateWindow[] = [];
     const routineWin = windowFrom(pick(j, ROUTINE_KEYS), 10080);
     if (routineWin) extra.push({ id: "routines", title: "Routines (7d)", window: routineWin, usageKnown: true });
-    const scopedWin = activeScopedWindow(j.limits);
-    if (scopedWin) extra.push({ id: "weekly-scoped", title: scopedWin.title, window: scopedWin.window, usageKnown: true });
+    extra.push(...scopedWindows(j.limits));
 
     let cost: ProviderCostSnapshot | null = null;
     const eu = j.extra_usage;
@@ -123,7 +126,7 @@ const claudeOAuthStrategy: ProviderFetchStrategy = {
 };
 
 async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<RefreshResult> {
-  if (!creds.refreshToken) throw new UnauthorizedError("missing refresh_token");
+  if (!creds.refreshToken) throw new RefreshRejectedError("missing refresh_token");
   const body = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: creds.refreshToken,
@@ -133,24 +136,9 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
     TOKEN_URL,
     body,
     { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    { timeoutMs: 30_000 },
+    { timeoutMs: 30_000, retry: false },
   );
-  const j = safeJson(res.body) ?? {};
-  if (res.status >= 400) {
-    if (j.error === "invalid_grant") throw new UnauthorizedError("invalid_grant: re-login required");
-    throw new UpstreamError(res.status, String(j.error ?? "refresh failed"));
-  }
-  const expiresAt = j.expires_in
-    ? new Date(ctx.now.getTime() + Number(j.expires_in) * 1000).toISOString()
-    : null;
-  return {
-    credentials: {
-      ...creds,
-      bearerToken: j.access_token ?? creds.bearerToken,
-      refreshToken: j.refresh_token ?? creds.refreshToken,
-      expiresAt,
-    },
-  };
+  return { credentials: decodeRefreshResponse(res, creds, ctx.now) };
 }
 
 export const claudeDescriptor: ProviderDescriptor = {

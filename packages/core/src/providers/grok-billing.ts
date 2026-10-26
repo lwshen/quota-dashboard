@@ -1,4 +1,4 @@
-// Adapted from CodexBar's GrokCreditsProxyFetcher and GrokWebBillingSnapshot.
+// Normalizes CLI proxy credits and web billing snapshots.
 import { UpstreamError } from "../adapter";
 import { clampPercent, parseIsoOrUnix, safeJson } from "../decode";
 import type { UsageSnapshot } from "../model";

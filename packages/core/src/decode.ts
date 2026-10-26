@@ -1,10 +1,23 @@
 export function num(v: unknown): number | undefined {
   if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
-  if (typeof v === "string") {
+  if (typeof v === "string" && v.trim() !== "") {
     const n = Number(v.trim());
-    return Number.isNaN(n) ? undefined : n;
+    return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
+}
+
+export function asRecord(value: unknown): Record<string, unknown> | null {
+  return value != null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+
+export function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export function slug(value: string): string {
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
 }
 
 export function parseIsoOrUnix(value: unknown): string | null {
