@@ -16,6 +16,9 @@ try {
   const tests = readdirSync(join(root, "packages/core/tests"))
     .filter((name) => name.endsWith(".test.cjs"))
     .map((name) => join(root, "packages/core/tests", name));
+  tests.push(...readdirSync(join(root, "apps/web/tests"))
+    .filter((name) => name.endsWith(".test.cjs"))
+    .map((name) => join(root, "apps/web/tests", name)));
   const result = spawnSync(process.execPath, ["--test", ...tests], {
     stdio: "inherit", env: { ...process.env, QUOTA_TEST_BUILD_DIR: buildDir },
   });

@@ -41,17 +41,23 @@ quota-dashboard/
 
 ## Implemented providers
 
-| Provider     | Path                                                     | Credentials                          | Output                                                              |
-| ------------ | -------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- |
-| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)               | Bearer key                           | Weekly usage + 5h rate window                                       |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                         | Bearer key                           | Balance (no window)                                                 |
-| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)        | access token (+refresh)              | 5h/7d/model/routines windows + extra spend                          |
-| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`)       | access token + account id (+refresh) | 5h/7d windows + credits                                             |
-| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex                        | same as Codex                                                       |
-| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback         | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`)                      | user token                           | Balance (no window)                                                 |
+| Provider     | Path                                                     | Credentials                          | Output                                                               |
+| ------------ | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)               | Bearer key                           | Weekly/session quotas + monthly total; ratio pools and legacy counts |
+| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                         | Bearer key                           | Balance (no window)                                                  |
+| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)        | access token (+refresh)              | 5h/7d/all model-scoped/routines windows + extra spend                |
+| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`)       | access token + account id (+refresh) | 5h/7d + Spark windows; Credits balance and workspace monthly cap     |
+| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex                        | same as Codex                                                        |
+| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback         | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance  |
+| **RightAPI** | account (`www.rightapi.ai/auth/me`)                      | user token                           | Balance (no window)                                                  |
 
 See the comment at the top of each `providers/*.ts` for how to obtain credentials. Claude/Codex tokens can be copy-pasted from your local `~/.claude/.credentials.json` and `~/.codex/auth.json`.
+
+Kimi session labels follow the API's actual duration. Missing usage stays unknown for each window independently. Claude model-scoped weekly limits are displayed even when their `is_active` flag is false; model identity keeps separate quotas from being compared as resets.
+
+Codex credit amounts use the native **Credits** unit. Monthly caps and independent purchased balances are shown together; a repeated monthly remainder is not counted twice. When a workspace advertises spend controls but omits a usable cap, an account-scoped monthly-usage lookup runs with a six-second budget. Failure of this optional lookup preserves the main quota and balance.
+
+Claude and both Codex slots recognize permanent OAuth refresh failures, including nested error codes. Polling stops using the rejected credential until it is replaced; temporary failures retain the existing retry backoff. Successful renewals save rotated tokens and the server-provided expiry, with no fixed eight-day lifetime assumption for Codex.
 
 ### Grok credentials and usage
 
@@ -90,7 +96,7 @@ scan local sessions, or fetch reset coupons. Adapted source attribution is in [T
 Polling and manual requests share in-flight work within one server process. Run a single
 instance so separate processes cannot rotate the same credential concurrently.
 
-Run `pnpm test` for the offline provider and HTTP transport tests, and `pnpm typecheck` for both packages.
+Run `pnpm test` for the offline provider, OAuth, HTTP transport, and card-rendering tests, and `pnpm typecheck` for both packages.
 
 ## Local development
 

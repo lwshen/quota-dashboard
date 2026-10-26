@@ -5,6 +5,13 @@ related test cases are adapted from CodexBar's GrokCreditsProxyFetcher,
 GrokWebBillingFetcher, GrokProtobufField, GrokPlan, GrokCredentialRouting,
 GrokProviderDescriptor, and their tests.
 
+The Kimi ratio/count reconciliation, Claude scoped weekly limits, Codex Spark
+windows and credit-limit mapping, and related regression tests are also adapted
+from CodexBar's KimiUsageSnapshot, KimiRatioPoolTests,
+KimiContradictoryUsageTests, ClaudeScopedWeeklyLimitMapper,
+CodexAdditionalRateLimitMapper, CodexSpendControlLimitMapping,
+CodexSpendControlsMonthlyUsage, CodexExtraUsageCost, and CodexTokenRefresher.
+
 Source: https://github.com/steipete/CodexBar
 
 MIT License

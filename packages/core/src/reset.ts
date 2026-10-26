@@ -132,8 +132,7 @@ export function detectQuotaResets(
   for (const ex of next.extraRateWindows ?? []) {
     if (!ex.usageKnown) continue;
     const p = prevExtras.get(ex.id);
-    // Same id can carry different quotas over time (claude "weekly-scoped" tracks whichever
-    // model limit is active; the title names it) — a changed title means a different window.
+    // Legacy snapshots can reuse an id for a different model; do not compare changed titles.
     if (!p || p.title !== ex.title) continue;
     if (!isReset(p.window, ex.window, minUsedPercent, elapsedMs)) continue;
     events.push(eventFrom(next.provider, ex.id, ex.title, p.window, ex.window));

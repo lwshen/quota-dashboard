@@ -4,9 +4,11 @@
 // built from the same implementation — see makeCodexDescriptor at the bottom.
 
 import type { CredentialField, FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
-import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";
-import type { NamedRateWindow, ProviderCostSnapshot, RateWindow, UsageProvider, UsageSnapshot } from "../model";
-import { clampPercent, num, parseIsoOrUnix, retryAfterSeconds, safeJson } from "../decode";
+import { RateLimitedError, RefreshRejectedError, UnauthorizedError, UpstreamError } from "../adapter";
+import type { NamedRateWindow, RateWindow, UsageProvider, UsageSnapshot } from "../model";
+import { asRecord, clampPercent, nonEmptyString, num, parseIsoOrUnix, retryAfterSeconds, safeJson, slug } from "../decode";
+import { codexCredits } from "./codex-credits";
+import { decodeRefreshResponse } from "./oauth-refresh";
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
@@ -20,12 +22,12 @@ interface WindowParsed {
 }
 
 function windowFrom(node: unknown): WindowParsed | null {
-  if (!node || typeof node !== "object") return null;
-  const obj = node as Record<string, unknown>;
+  const obj = asRecord(node);
+  if (!obj) return null;
   const used = num(obj.used_percent);
   if (used == null) return null;
   const seconds = num(obj.limit_window_seconds);
-  const minutes = seconds != null ? Math.round(seconds / 60) : null;
+  const minutes = seconds != null && seconds >= 60 ? Math.floor(seconds / 60) : null;
   return {
     window: {
       usedPercent: clampPercent(used),
@@ -34,6 +36,37 @@ function windowFrom(node: unknown): WindowParsed | null {
     },
     minutes,
   };
+}
+
+function additionalWindows(value: unknown): NamedRateWindow[] {
+  if (!Array.isArray(value)) return [];
+  const windows: NamedRateWindow[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const entry = asRecord(item);
+    const rate = asRecord(entry?.rate_limit);
+    if (!rate) continue;
+    const name = nonEmptyString(entry?.limit_name);
+    const feature = nonEmptyString(entry?.metered_feature);
+    const spark = [name, feature].some((label) => label?.toLowerCase().includes("spark"));
+    const primary = windowFrom(rate.primary_window);
+    const secondary = windowFrom(rate.secondary_window);
+    const candidates = spark ? [primary, secondary] : [primary ?? secondary];
+    for (const [index, parsed] of candidates.entries()) {
+      if (!parsed) continue;
+      const weekly = parsed.minutes != null && parsed.minutes >= 6 * 1440
+        ? true : parsed.minutes != null && parsed.minutes <= 360 ? false : index === 1;
+      const identity = slug(feature ?? name ?? "");
+      const id = spark ? (weekly ? "codex-spark-weekly" : "codex-spark") : `codex-${identity}`;
+      if ((!spark && !identity) || seen.has(id)) continue;
+      seen.add(id);
+      windows.push({
+        id, title: spark ? (weekly ? "Codex Spark (7d)" : "Codex Spark (5h)") : name ?? feature!,
+        window: parsed.window, usageKnown: true,
+      });
+    }
+  }
+  return windows;
 }
 
 function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy {
@@ -51,10 +84,10 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
       if (c.accountId) headers["ChatGPT-Account-Id"] = c.accountId;
 
       const res = await ctx.http.get(USAGE_URL, headers, { timeoutMs: 30_000 });
-      if (res.status === 401 || res.status === 403) throw new UnauthorizedError();
+      if (res.status === 401) throw new UnauthorizedError();
       if (res.status === 429) throw new RateLimitedError(retryAfterSeconds(res.headers));
       if (res.status >= 400) throw new UpstreamError(res.status, res.body.slice(0, 200));
-      const j = safeJson(res.body);
+      const j = asRecord(safeJson(res.body));
       if (!j) throw new UpstreamError(res.status, "invalid JSON");
 
       const rl = (j.rate_limit ?? {}) as Record<string, unknown>;
@@ -68,24 +101,11 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
         secondary = a.window;
       }
 
-      const extra: NamedRateWindow[] = [];
-      const additional = Array.isArray(j.additional_rate_limits) ? j.additional_rate_limits : [];
-      for (const item of additional) {
-        const w = windowFrom(item?.rate_limit?.primary_window) ?? windowFrom(item?.rate_limit?.secondary_window);
-        if (w) {
-          const name = String(item?.limit_name ?? item?.metered_feature ?? "extra");
-          extra.push({ id: name, title: name, window: w.window, usageKnown: true });
-        }
-      }
-
-      let cost: ProviderCostSnapshot | null = null;
-      const credits = j.credits;
-      if (credits && credits.has_credits && !credits.unlimited && credits.balance != null) {
-        cost = { used: 0, limit: num(credits.balance) ?? 0, currencyCode: "USD", period: "Credits balance" };
-      }
+      const extra = additionalWindows(j.additional_rate_limits);
+      const cost = await codexCredits(j, c.accountId, headers, ctx);
 
       const planType = typeof j.plan_type === "string" ? j.plan_type : null;
-      const resetCredits = j.rate_limit_reset_credits as Record<string, unknown> | null;
+      const resetCredits = asRecord(j.rate_limit_reset_credits);
       const resetCount = num(resetCredits?.available_count);
       const applicableResetCount = num(resetCredits?.applicable_available_count);
       const identityDetails = [
@@ -101,7 +121,7 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
         extraRateWindows: extra.length ? extra : null,
         providerCost: cost,
         identity: identityDetails.length ? { providerID: provider, loginMethod: identityDetails.join(" · ") } : null,
-        dataConfidence: primary || secondary ? "exact" : "unknown",
+        dataConfidence: primary || secondary || extra.length || cost ? "exact" : "unknown",
         updatedAt: ctx.now.toISOString(),
       };
       return snapshot;
@@ -110,7 +130,7 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
 }
 
 async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<RefreshResult> {
-  if (!creds.refreshToken) throw new UnauthorizedError("missing refresh_token");
+  if (!creds.refreshToken) throw new RefreshRejectedError("missing refresh_token");
   const body = JSON.stringify({
     client_id: creds.extra?.clientId || CLIENT_ID,
     grant_type: "refresh_token",
@@ -121,24 +141,9 @@ async function refresh(creds: ProviderCredentials, ctx: FetchContext): Promise<R
     TOKEN_URL,
     body,
     { "Content-Type": "application/json", Accept: "application/json" },
-    { timeoutMs: 30_000 },
+    { timeoutMs: 30_000, retry: false },
   );
-  const j = safeJson(res.body) ?? {};
-  if (res.status >= 400) {
-    const err = String(j.error ?? "");
-    if (["refresh_token_expired", "refresh_token_reused", "invalid_grant", "refresh_token_invalidated"].includes(err)) {
-      throw new UnauthorizedError(`${err}: re-login required`);
-    }
-    throw new UpstreamError(res.status, err || "refresh failed");
-  }
-  return {
-    credentials: {
-      ...creds,
-      bearerToken: j.access_token ?? creds.bearerToken,
-      refreshToken: j.refresh_token ?? creds.refreshToken,
-      expiresAt: new Date(ctx.now.getTime() + 8 * 24 * 3600 * 1000).toISOString(), // time-based: 8 days
-    },
-  };
+  return { credentials: decodeRefreshResponse(res, creds, ctx.now) };
 }
 
 const CREDENTIAL_FIELDS: CredentialField[] = [
