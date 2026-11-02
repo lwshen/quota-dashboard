@@ -11,6 +11,7 @@ export function Header({
   onOpenLogin,
   onRefresh,
   onAddCredential,
+  onManageProviders,
   onLogout,
 }: {
   now: number;
@@ -19,6 +20,7 @@ export function Header({
   onOpenLogin: () => void;
   onRefresh: () => void;
   onAddCredential: () => void;
+  onManageProviders: () => void;
   onLogout: () => void;
 }) {
   // Initialize from the attribute the no-flash script already applied to <html>, so the
@@ -61,6 +63,11 @@ export function Header({
         <button type="button" className="tgl" onClick={toggleTheme} suppressHydrationWarning>
           ◐ {theme === "dark" ? "Light" : "Dark"}
         </button>
+        {authed && (
+          <button type="button" className="tgl" onClick={onManageProviders}>
+            渠道管理
+          </button>
+        )}
         <div style={{ position: "relative" }}>
           {authed ? (
             <>

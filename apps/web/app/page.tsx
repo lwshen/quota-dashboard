@@ -5,23 +5,28 @@ import { Header } from "@/components/Header";
 import { LoginModal } from "@/components/LoginModal";
 import { ProviderCard, type ProviderView } from "@/components/ProviderCard";
 import { AddCredentialForm, type ProviderMeta } from "@/components/AddCredentialForm";
+import { ProviderSettings } from "@/components/ProviderSettings";
 
 export default function Home() {
   const [views, setViews] = useState<ProviderView[]>([]);
+  const [usageLoaded, setUsageLoaded] = useState(false);
   const [providers, setProviders] = useState<ProviderMeta[]>([]);
   const [authed, setAuthed] = useState(false);
   const [now, setNow] = useState(0);
 
   const [showLogin, setShowLogin] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [showProviderSettings, setShowProviderSettings] = useState(false);
   const [formProvider, setFormProvider] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadUsage = useCallback(async () => {
     try {
       const res = await fetch("/api/usage", { cache: "no-store" });
+      if (!res.ok) return;
       const j = await res.json();
       setViews(j.providers ?? []);
+      setUsageLoaded(true);
     } catch {
       // keep the last view on transient errors
     }
@@ -75,6 +80,7 @@ export default function Home() {
     } finally {
       setAuthed(false);
       setShowForm(false);
+      setShowProviderSettings(false);
       // Re-fetch so account identity (balance / email) drops from the public view.
       loadUsage();
     }
@@ -95,9 +101,15 @@ export default function Home() {
           onOpenLogin={() => setShowLogin(true)}
           onRefresh={refreshNow}
           onAddCredential={() => openForm()}
+          onManageProviders={() => setShowProviderSettings(true)}
           onLogout={logout}
         />
 
+        {usageLoaded && views.length === 0 && (
+          <div className="qcard">
+            <div className="emptystate">暂无显示的渠道{authed ? "，可在「渠道管理」中开启。" : "。"}</div>
+          </div>
+        )}
         <div className="qgrid">
           {views.map((v) => (
             <ProviderCard
@@ -112,6 +124,10 @@ export default function Home() {
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLoginSuccess} />}
+
+      {authed && showProviderSettings && (
+        <ProviderSettings onClose={() => setShowProviderSettings(false)} onChanged={loadUsage} />
+      )}
 
       {authed && showForm && (
         <AddCredentialForm

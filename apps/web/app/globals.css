@@ -662,3 +662,69 @@ select.field {
 .modal-close:hover {
   color: var(--text);
 }
+
+/* ---- provider settings ---- */
+.provider-settings {
+  color: var(--text);
+  max-width: min(380px, calc(100vw - 40px));
+}
+
+.provider-settings::backdrop {
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(5px);
+}
+
+.provider-settings .modal-title {
+  margin: 0;
+}
+
+.provider-settings .modal-sub {
+  margin-bottom: 16px;
+}
+
+.provider-settings-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.provider-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.provider-setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.provider-setting input {
+  width: 32px;
+  height: 20px;
+  flex: none;
+  cursor: pointer;
+  accent-color: var(--good);
+}
+
+.provider-setting input:disabled {
+  cursor: wait;
+}
+
+.provider-settings button:focus-visible,
+.provider-setting input:focus-visible {
+  outline: 2px solid var(--dim);
+  outline-offset: 4px;
+}
+
+@media (max-width: 480px) {
+  .ctl {
+    flex-wrap: wrap;
+  }
+}

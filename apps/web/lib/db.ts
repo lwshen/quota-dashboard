@@ -11,6 +11,10 @@ export function db(): Database.Database {
   const d = new Database(ENV.dbPath);
   d.pragma("journal_mode = WAL");
   d.exec(`
+    CREATE TABLE IF NOT EXISTS provider_settings (
+      provider   TEXT PRIMARY KEY,
+      enabled    INTEGER NOT NULL DEFAULT 1
+    );
     CREATE TABLE IF NOT EXISTS credentials (
       provider   TEXT PRIMARY KEY,
       enabled    INTEGER NOT NULL DEFAULT 1,
