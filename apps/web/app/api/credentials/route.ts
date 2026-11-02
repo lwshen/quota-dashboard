@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ProviderCredentials, SourceMode } from "@quota/core";
 import { getDescriptor, isProvider } from "@quota/core";
-import { deleteCredential, listCredentials, saveCredential } from "@/lib/store";
+import { deleteCredential, getCredential, listCredentials, saveCredential } from "@/lib/store";
 import { fetchAndStore } from "@/lib/fetcher";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
 import { normalizeGrokCredentials } from "@quota/core/grok-auth";
@@ -71,6 +71,7 @@ export async function POST(req: Request) {
 
   const now = new Date();
   saveCredential(provider, mode, creds, now);
+  if (!getCredential(provider)?.enabled) return NextResponse.json({ ok: true, disabled: true });
   const result = await fetchAndStore(provider);
   return NextResponse.json({ ok: true, result });
 }

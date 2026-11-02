@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { listDescriptors } from "@quota/core";
-import { listSnapshots } from "@/lib/store";
+import { listProviderSettings, listSnapshots } from "@/lib/store";
 import { ENV } from "@/lib/env";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 
@@ -13,7 +13,8 @@ export async function GET() {
   // identity (which can hold balance / email / org). Authed admins get the full view.
   const authed = ENV.authDisabled || (await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value));
   const snaps = new Map(listSnapshots().map((s) => [s.provider, s]));
-  const providers = listDescriptors().map((d) => {
+  const settings = listProviderSettings();
+  const providers = listDescriptors().filter((d) => settings.get(d.provider) !== false).map((d) => {
     const s = snaps.get(d.provider);
     let snapshot = null;
     if (s?.snapshot) {

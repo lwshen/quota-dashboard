@@ -19,6 +19,21 @@ interface CredentialRow {
   updated_at: string;
 }
 
+export function listProviderSettings(): Map<string, boolean> {
+  const rows = db().prepare(`SELECT provider, enabled FROM provider_settings`).all() as { provider: string; enabled: number }[];
+  return new Map(rows.map((r) => [r.provider, !!r.enabled]));
+}
+
+export function setProviderEnabled(provider: UsageProvider, enabled: boolean): void {
+  db().prepare(`INSERT INTO provider_settings (provider, enabled) VALUES (?, ?)
+    ON CONFLICT(provider) DO UPDATE SET enabled=excluded.enabled`).run(provider, Number(enabled));
+}
+
+// A separate setting also covers providers that have no credentials yet.
+const credentialSelect = `SELECT c.provider, (c.enabled AND COALESCE(s.enabled, 1)) AS enabled,
+  c.mode, c.data, c.updated_at FROM credentials c
+  LEFT JOIN provider_settings s ON s.provider=c.provider`;
+
 function rowToCredential(r: CredentialRow): StoredCredential {
   return {
     provider: r.provider as UsageProvider,
@@ -59,13 +74,13 @@ export function deleteCredential(provider: UsageProvider): void {
 }
 
 export function listCredentials(): StoredCredential[] {
-  const rows = db().prepare(`SELECT provider, enabled, mode, data, updated_at FROM credentials`).all() as CredentialRow[];
+  const rows = db().prepare(credentialSelect).all() as CredentialRow[];
   return rows.map(rowToCredential);
 }
 
 export function getCredential(provider: UsageProvider): StoredCredential | null {
   const r = db()
-    .prepare(`SELECT provider, enabled, mode, data, updated_at FROM credentials WHERE provider=?`)
+    .prepare(`${credentialSelect} WHERE c.provider=?`)
     .get(provider) as CredentialRow | undefined;
   return r ? rowToCredential(r) : null;
 }

@@ -115,6 +115,8 @@ Prefer to do it by hand? `cp apps/web/.env.example apps/web/.env`, then put an `
 
 Open the page → click "+ Add credentials" → pick a provider, paste the key/token → save and it fetches immediately. The background poller refreshes every `POLL_INTERVAL_SECONDS` seconds.
 
+After signing in as an administrator, click **渠道管理** (Channels) in the header to disable or re-enable individual providers. Disabled providers are hidden from every visitor and skipped by both background polling and manual refresh; requests already in progress may finish. Credentials and history are retained. Settings persist in SQLite across page reloads and server restarts, including for providers without credentials. Updating credentials does not re-enable a disabled provider. Re-enabling restores its card immediately; usage updates on the next poll or manual refresh. `ENABLE_POLLER=false` still disables background polling globally.
+
 To inspect a provider response while debugging, set `DEBUG=true`. Raw quota API response bodies are written to the **server console** during each fetch and are never returned by the dashboard API. Do not enable this in production, because responses may contain account data.
 
 ## Quota-reset notifications
