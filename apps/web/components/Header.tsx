@@ -10,7 +10,6 @@ export function Header({
   refreshing,
   onOpenLogin,
   onRefresh,
-  onAddCredential,
   onManageProviders,
   onLogout,
 }: {
@@ -19,7 +18,6 @@ export function Header({
   refreshing: boolean;
   onOpenLogin: () => void;
   onRefresh: () => void;
-  onAddCredential: () => void;
   onManageProviders: () => void;
   onLogout: () => void;
 }) {
@@ -95,16 +93,6 @@ export function Header({
                     >
                       <span className="mi-icon">↻</span>
                       {refreshing ? "刷新中… · refreshing" : "刷新数据 · Refresh"}
-                    </button>
-                    <button
-                      type="button"
-                      className="menu-item"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onAddCredential();
-                      }}
-                    >
-                      <span className="mi-icon">⚿</span>配置凭据 · Credentials
                     </button>
                     <button
                       type="button"
