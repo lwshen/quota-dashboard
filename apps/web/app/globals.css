@@ -666,8 +666,15 @@ select.field {
 /* ---- channel and credential management ---- */
 .management-dialog {
   --management-danger: color-mix(in srgb, var(--danger) 80%, var(--text));
-  width: min(640px, calc(100vw - 32px));
-  max-width: min(640px, calc(100vw - 32px));
+  --management-success: color-mix(in srgb, var(--good) 65%, var(--text));
+  --management-warning: color-mix(in srgb, var(--warn) 65%, var(--text));
+  --management-control-border: color-mix(
+    in srgb,
+    var(--dim) 65%,
+    var(--border2)
+  );
+  width: min(720px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
   max-height: calc(100dvh - 32px);
   color: var(--text);
   padding: 0;
@@ -696,6 +703,7 @@ select.field {
 
 .management-dialog .modal-title {
   margin: 0;
+  font-size: 20px;
   overflow-wrap: anywhere;
 }
 
@@ -718,6 +726,8 @@ select.field {
   overscroll-behavior: contain;
   min-height: 0;
   padding: 0 24px 24px;
+  flex: 1;
+  scroll-padding-block: 24px 140px;
 }
 
 .management-footer {
@@ -746,7 +756,7 @@ select.field {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 20px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -756,21 +766,31 @@ select.field {
 }
 
 .provider-setting .pname {
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 16px;
   line-height: 1.4;
   margin: 0;
 }
 
-.management-tag,
-.management-status {
-  font-size: 13px;
+.management-tag {
+  font-size: 14px;
   line-height: 1.5;
   color: var(--dim);
   font-weight: 400;
 }
 
-.management-status {
-  margin: 6px 0 0;
+.provider-setting-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.management-tag {
+  margin: 0;
 }
 
 .provider-setting-actions {
@@ -781,6 +801,7 @@ select.field {
 }
 
 .management-switch {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -789,6 +810,52 @@ select.field {
   font-size: 13px;
   color: var(--dim);
   white-space: nowrap;
+}
+
+.management-switch input[type="checkbox"] {
+  position: absolute;
+  width: 36px;
+  height: 24px;
+  opacity: 0;
+}
+
+.management-switch-track {
+  width: 36px;
+  height: 22px;
+  border: 1px solid var(--management-control-border);
+  border-radius: 999px;
+  background: var(--track);
+  flex: none;
+  padding: 3px;
+}
+
+.management-switch-track::after {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+.management-switch input:checked + .management-switch-track {
+  border-color: var(--management-success);
+  background: var(--management-success);
+}
+
+.management-switch input:checked + .management-switch-track::after {
+  transform: translateX(14px);
+  background: var(--panel);
+}
+
+.management-switch input:focus-visible + .management-switch-track {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.management-switch:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .management-dialog input[type="checkbox"],
@@ -835,8 +902,8 @@ select.field {
 }
 
 .management-dialog .modal-close {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   flex: none;
   color: var(--dim);
 }
@@ -873,9 +940,12 @@ select.field {
 }
 
 .management-feedback.error,
-.credential-error,
-.error-text {
+.credential-error {
   color: var(--management-danger);
+}
+
+.management-feedback.error {
+  border-color: var(--management-danger);
 }
 
 .credential-status {
@@ -902,9 +972,8 @@ select.field {
 
 .credential-mode {
   margin: 20px 0 0;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  padding: 0;
+  border: 0;
   min-width: 0;
   font-size: 14px;
 }
@@ -924,13 +993,14 @@ select.field {
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
-  margin-top: 20px;
+  margin: 0;
 }
 
 .management-dialog .field {
-  font-size: 14px;
+  font-size: 16px;
   min-height: 44px;
   min-width: 0;
+  border-color: var(--management-control-border);
 }
 
 .management-dialog select.field {
@@ -940,8 +1010,7 @@ select.field {
 .credential-saved {
   color: var(--dim);
   font-size: 13px;
-  display: block;
-  margin-top: 4px;
+  line-height: 1.5;
 }
 
 .credential-input-row {
@@ -975,16 +1044,47 @@ select.field {
 
 .credential-advanced {
   margin-top: 20px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
 }
 
 .credential-advanced summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   cursor: pointer;
   font-size: 14px;
-  min-height: 44px;
-  align-content: center;
+  min-height: 68px;
   line-height: 1.5;
+}
+
+.credential-advanced summary::after {
+  content: "+";
+  font-size: 20px;
+  color: var(--dim);
+}
+
+.credential-advanced[open] summary::after {
+  content: "−";
+}
+
+.credential-advanced[open] {
+  padding-bottom: 20px;
+}
+
+.credential-advanced-hint {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.credential-advanced-count {
+  margin-left: auto;
+  color: var(--dim);
+  white-space: nowrap;
 }
 
 .credential-confirm {
@@ -992,16 +1092,339 @@ select.field {
 }
 
 .credential-footer {
+  position: sticky;
+  bottom: -24px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 24px -24px -24px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.credential-footer-actions {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  margin-top: 24px;
 }
 
-.credential-footer > button {
+.credential-footer-actions > button {
   flex: 1 1 180px;
   margin: 0;
   min-height: 44px;
+  font-size: 14px;
+}
+
+.credential-draft-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.credential-mode legend {
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.credential-mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.credential-mode-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid var(--management-control-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.credential-mode-option:has(input:checked) {
+  border-color: var(--dim);
+  background: var(--panel2);
+}
+
+.credential-mode-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.credential-mode-option strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.credential-mode-option > span > span {
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.credential-replace-warning {
+  padding: 12px;
+  border-radius: 9px;
+  color: var(--management-warning);
+  background: color-mix(in srgb, var(--warn) 8%, var(--panel));
+  line-height: 1.6;
+  margin: 12px 0 0;
+}
+
+.credential-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.credential-section-heading {
+  margin-top: 24px;
+}
+
+.credential-section-heading h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.credential-section-heading .management-help {
+  margin-top: 4px;
+}
+
+.credential-field {
+  margin-top: 20px;
+}
+
+.credential-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.credential-required {
+  font-size: 12px;
+  color: var(--dim);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.credential-import {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px dashed var(--management-control-border);
+  border-radius: 10px;
+}
+
+.credential-import select {
+  margin-top: 8px;
+}
+
+.credential-import .flabel:not(:first-child) {
+  margin-top: 16px;
+}
+
+.management-workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.management-detail {
+  width: min(940px, calc(100vw - 32px));
+  height: min(820px, calc(100dvh - 32px));
+}
+
+.management-title-tag {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+  display: inline-block;
+  margin-left: 12px;
+}
+
+.management-nav {
+  width: 208px;
+  flex: none;
+  background: var(--panel2);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+
+.management-nav-label {
+  font-size: 13px;
+  color: var(--dim);
+  padding: 0 12px;
+  margin: 0 0 8px;
+}
+
+.management-nav-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  text-align: left;
+  color: var(--text);
+  padding: 12px;
+  font:
+    500 14px var(--font-space-grotesk),
+    sans-serif;
+  cursor: pointer;
+}
+
+.management-nav-item[aria-current="page"] {
+  background: var(--panel);
+  border-color: var(--management-control-border);
+}
+
+.management-nav-status {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.management-mobile-select {
+  display: none;
+}
+
+.management-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 0 4px;
+}
+
+.management-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.management-filters button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: var(--dim);
+  font:
+    500 14px var(--font-space-grotesk),
+    sans-serif;
+  cursor: pointer;
+}
+
+.management-filters button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--management-control-border);
+}
+
+.management-filters button span {
+  font:
+    400 12px var(--font-jetbrains-mono),
+    monospace;
+}
+
+.management-summary {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.management-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.management-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: var(--dim);
+  background: var(--panel2);
+}
+
+.management-badge.success {
+  color: var(--management-success);
+  background: color-mix(in srgb, var(--good) 8%, var(--panel));
+}
+
+.management-badge.error {
+  color: var(--management-danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+}
+
+.management-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dim);
+}
+
+.management-status-dot.success {
+  background: var(--management-success);
+}
+
+.management-status-dot.error {
+  background: var(--management-danger);
+}
+
+.management-last-fetch {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.management-draft {
+  color: var(--management-warning);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.management-empty {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+@media (max-width: 760px) {
+  .management-nav {
+    display: none;
+  }
+  .management-mobile-select {
+    display: block;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--dim);
+  }
 }
 
 @media (max-width: 480px) {
@@ -1027,6 +1450,27 @@ select.field {
   .provider-setting-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .management-title-tag {
+    display: block;
+    margin: 4px 0 0;
+  }
+  .credential-mode-options {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .credential-mode-option {
+    padding: 12px;
+  }
+  .credential-footer {
+    bottom: -16px;
+    margin-inline: -16px;
+    margin-bottom: -16px;
+    padding: 12px 16px 16px;
+  }
+  .management-filters button {
+    padding-inline: 9px;
   }
 
   .qcard > .row:first-child,

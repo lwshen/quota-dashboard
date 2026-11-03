@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseGrokAuthFile, type GrokAuthImport } from "@quota/core/grok-auth";
-import { emptyDraft, type CredentialDraft, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
+import { credentialStatus, emptyDraft, hasDraftChanges, type CredentialDraft, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
 
 export function AddCredentialForm({ provider, credential, draft, onDraftChange, onBusyChange, onSaved }: {
   provider: ProviderMeta;
@@ -21,15 +21,21 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [advanced, setAdvanced] = useState(Object.keys(draft.fields).some((key) => key !== "bearerToken" && key !== "accountId"));
   const form = useRef<HTMLFormElement>(null);
+  const feedbackRef = useRef<HTMLParagraphElement>(null);
   const updating = !!credential && draft.action === "update";
   const hasTokenInput = provider.credentialFields.some((f) => f.secret && draft.fields[f.key]?.trim());
   const needsConfirmation = updating && hasTokenInput;
   const mainFields = provider.credentialFields.filter((f) => f.required || f.key === "accountId");
   const extraFields = provider.credentialFields.filter((f) => !mainFields.includes(f));
+  const status = credentialStatus(credential);
 
   useEffect(() => {
     if (Object.keys(errors).length) form.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')?.focus();
   }, [errors]);
+
+  useEffect(() => {
+    if (feedback && !Object.keys(errors).length) feedbackRef.current?.scrollIntoView({ block: "nearest" });
+  }, [feedback, errors]);
 
   function setWorking(value: boolean) {
     pending.current = value;
@@ -131,8 +137,8 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
     const clearing = updating && draft.clearFields.includes(field.key);
     return (
       <div className="credential-field" key={field.key}>
-        <label className="flabel" htmlFor={id}>{field.label}{field.required && " *"}</label>
-        {updating && configured && <span className="credential-saved">已配置 · {clearing ? "保存时清除" : "留空保留"}</span>}
+        <div className="credential-field-label"><label className="flabel" htmlFor={id}>{field.label}{field.required && <span className="credential-required">必填</span>}</label>
+        {updating && configured && <span className="credential-saved">{clearing ? "保存时清除" : "已配置 · 留空保留"}</span>}</div>
         <div className="credential-input-row">
           <input id={id} name={field.key} className="field" type={field.secret && !revealed[field.key] ? "password" : "text"}
             placeholder={updating && configured ? "留空保留已保存值" : field.placeholder}
@@ -159,19 +165,20 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
   return (
     <form ref={form} className="credential-form" onSubmit={submit} noValidate aria-label={`${provider.label} 凭据`}>
       <section className="credential-status" aria-label="渠道状态">
-        <p><strong>{provider.enabled ? "渠道已启用" : "渠道已停用"}</strong><span>{credential ? "已配置凭据" : "尚未配置凭据"}</span></p>
+        <div className="credential-status-heading"><strong>{provider.enabled ? "渠道已启用" : "渠道已停用"}</strong><span className={`management-badge ${status.tone}`}><span className={`management-status-dot ${status.tone}`} aria-hidden="true" />{status.label}</span></div>
         <p className="management-help">{credential?.fetchedAt ? `最近获取：${new Date(credential.fetchedAt).toLocaleString("zh-CN")}` : "尚未获取用量。"}</p>
         {credential?.fetchError && <p className="credential-error">上次获取失败：{credential.fetchError}</p>}
         {!provider.enabled && <p className="management-help">停用期间仅保存凭据，不会获取用量。启用后才会恢复显示和刷新。</p>}
       </section>
-      <p className="management-help">凭据仅在服务端加密存储，不会返回前端。</p>
       {credential && <fieldset className="credential-mode" disabled={busy}>
         <legend>保存方式</legend>
-        <label className="credential-check"><input type="radio" name="credential-action" value="update" checked={draft.action === "update"}
-          onChange={() => { onDraftChange({ ...draft, action: "update", clearFields: [], confirmSameAccount: false }); setErrors({}); setFeedback(null); }} />更新同一账户 · 留空保留已有值</label>
-        <label className="credential-check"><input type="radio" name="credential-action" value="replace" checked={draft.action === "replace"}
-          onChange={() => { onDraftChange({ ...draft, action: "replace", clearFields: [], confirmSameAccount: false }); setErrors({}); setFeedback(null); }} />替换整套凭据 · 用于切换账户</label>
-        {draft.action === "replace" && <p className="management-help">请填写新账户需要的全部凭据。原凭据、用量快照及历史记录将被替换。</p>}
+        <div className="credential-mode-options">
+        <label className="credential-mode-option"><input type="radio" name="credential-action" value="update" checked={draft.action === "update"}
+          onChange={() => { onDraftChange({ ...draft, action: "update", clearFields: [], confirmSameAccount: false }); setErrors({}); setFeedback(null); }} /><span><strong>更新同一账户</strong><span>留空保留已有值</span></span></label>
+        <label className="credential-mode-option"><input type="radio" name="credential-action" value="replace" checked={draft.action === "replace"}
+          onChange={() => { onDraftChange({ ...draft, action: "replace", clearFields: [], confirmSameAccount: false }); setErrors({}); setFeedback(null); }} /><span><strong>替换整套凭据</strong><span>用于切换账户</span></span></label>
+        </div>
+        {draft.action === "replace" && <p className="credential-replace-warning">请填写新账户需要的全部凭据。保存后将清除原账户的用量快照和历史记录。</p>}
       </fieldset>}
       {provider.provider === "grok" && <section className="credential-import">
         <label className="flabel" htmlFor="grok-auth-file">导入 Grok auth.json</label>
@@ -197,9 +204,9 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
           <option value="">请选择账户</option>{accounts.map((account) => <option key={account.scope} value={account.scope}>{account.label}</option>)}
         </select></>}
       </section>}
-      {mainFields.map(renderField)}
+      <section className="credential-fields-section" aria-labelledby="credential-fields-title"><div className="credential-section-heading"><h3 id="credential-fields-title">账户凭据</h3><p className="management-help">凭据在服务端加密存储，保存后不会返回前端。</p></div>{mainFields.map(renderField)}</section>
       {extraFields.length > 0 && <details className="credential-advanced" open={advanced} onToggle={(event) => setAdvanced(event.currentTarget.open)}>
-        <summary>自动续期与其他可选设置</summary>
+        <summary><span>可选设置<span className="credential-advanced-hint">{extraFields.some((field) => field.key === "refreshToken") ? "自动续期与其他选项" : extraFields.map((field) => field.label.split("（")[0]).join("、")}</span></span><span className="credential-advanced-count">{extraFields.length} 项</span></summary>
         {extraFields.map(renderField)}
       </details>}
       {needsConfirmation && <div className="credential-confirm">
@@ -209,10 +216,13 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
         <p className="fhelp" id="same-account-help">更新会保留未填写的凭据。切换账户请使用「替换整套凭据」，避免混用 Token。</p>
         {errors.sameAccount && <p className="credential-error" id="same-account-error">{errors.sameAccount}</p>}
       </div>}
-      {feedback && <p className={`management-feedback${feedback.error ? " error" : ""}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
+      {feedback && <p ref={feedbackRef} className={`management-feedback${feedback.error ? " error" : ""}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
       <div className="credential-footer">
-        <button type="submit" className="btn-primary" disabled={busy || (accounts.length > 1 && !scope)}>{busy ? "处理中…" : provider.enabled ? "保存并获取用量" : "保存凭据"}</button>
+        <span className="credential-draft-note">{hasDraftChanges(draft) ? "有未保存的更改 · 关闭面板后丢弃" : "未保存的输入仅在本次管理会话保留"}</span>
+        <div className="credential-footer-actions">
         {credential && <button type="button" className="btn-ghost" disabled={busy} onClick={() => fetchUsage(!provider.enabled)}>{provider.enabled ? "重新获取用量" : "启用并获取用量"}</button>}
+        <button type="submit" className="btn-primary" disabled={busy || (accounts.length > 1 && !scope)}>{busy ? "处理中…" : provider.enabled ? "保存并获取用量" : "保存凭据"}</button>
+        </div>
       </div>
     </form>
   );
