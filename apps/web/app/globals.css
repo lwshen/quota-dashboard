@@ -970,25 +970,6 @@ select.field {
   color: var(--dim);
 }
 
-.credential-mode {
-  margin: 20px 0 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-  font-size: 14px;
-}
-
-.credential-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  font-size: 14px;
-  line-height: 1.5;
-  cursor: pointer;
-  overflow-wrap: anywhere;
-}
-
 .management-dialog .flabel {
   color: var(--text);
   font-size: 14px;
@@ -1087,10 +1068,6 @@ select.field {
   white-space: nowrap;
 }
 
-.credential-confirm {
-  margin-top: 20px;
-}
-
 .credential-footer {
   position: sticky;
   bottom: -24px;
@@ -1121,57 +1098,6 @@ select.field {
   font-size: 13px;
   line-height: 1.5;
   color: var(--dim);
-}
-
-.credential-mode legend {
-  margin-bottom: 10px;
-  font-weight: 500;
-}
-
-.credential-mode-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.credential-mode-option {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 16px;
-  border: 1px solid var(--management-control-border);
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-.credential-mode-option:has(input:checked) {
-  border-color: var(--dim);
-  background: var(--panel2);
-}
-
-.credential-mode-option > span {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.credential-mode-option strong {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.credential-mode-option > span > span {
-  color: var(--dim);
-  font-size: 14px;
-}
-
-.credential-replace-warning {
-  padding: 12px;
-  border-radius: 9px;
-  color: var(--management-warning);
-  background: color-mix(in srgb, var(--warn) 8%, var(--panel));
-  line-height: 1.6;
-  margin: 12px 0 0;
 }
 
 .credential-status-heading {
@@ -1455,13 +1381,6 @@ select.field {
   .management-title-tag {
     display: block;
     margin: 4px 0 0;
-  }
-  .credential-mode-options {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .credential-mode-option {
-    padding: 12px;
   }
   .credential-footer {
     bottom: -16px;

@@ -184,7 +184,7 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
         )}
         {!loading && provider && (
           <AddCredentialForm key={provider.provider} provider={provider} credential={credential}
-            draft={drafts[provider.provider] ?? emptyDraft(!!credential)}
+            draft={drafts[provider.provider] ?? emptyDraft()}
             onDraftChange={(draft) => setDrafts((previous) => ({ ...previous, [provider.provider]: draft }))}
             onBusyChange={setBusy} onSaved={changed} />
         )}

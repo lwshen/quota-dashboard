@@ -24,13 +24,10 @@ export interface CredentialMeta {
 
 export interface CredentialDraft {
   fields: Record<string, string>;
-  action: "update" | "replace";
-  clearFields: string[];
-  confirmSameAccount: boolean;
 }
 
-export function emptyDraft(configured: boolean): CredentialDraft {
-  return { fields: {}, action: configured ? "update" : "replace", clearFields: [], confirmSameAccount: false };
+export function emptyDraft(): CredentialDraft {
+  return { fields: {} };
 }
 
 export function credentialStatus(credential?: CredentialMeta) {
@@ -41,5 +38,5 @@ export function credentialStatus(credential?: CredentialMeta) {
 }
 
 export function hasDraftChanges(draft?: CredentialDraft) {
-  return !!draft && (Object.values(draft.fields).some((value) => value.trim()) || draft.clearFields.length > 0);
+  return !!draft && Object.values(draft.fields).some((value) => value.trim());
 }
