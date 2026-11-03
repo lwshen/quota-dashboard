@@ -194,7 +194,7 @@ body {
 /* ---- cards ---- */
 .qgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -663,23 +663,87 @@ select.field {
   color: var(--text);
 }
 
-/* ---- provider settings ---- */
-.provider-settings {
+/* ---- channel and credential management ---- */
+.management-dialog {
+  --management-danger: color-mix(in srgb, var(--danger) 80%, var(--text));
+  --management-success: color-mix(in srgb, var(--good) 65%, var(--text));
+  --management-warning: color-mix(in srgb, var(--warn) 65%, var(--text));
+  --management-control-border: color-mix(
+    in srgb,
+    var(--dim) 65%,
+    var(--border2)
+  );
+  width: min(720px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
   color: var(--text);
-  max-width: min(380px, calc(100vw - 40px));
+  padding: 0;
+  overflow: hidden;
 }
 
-.provider-settings::backdrop {
+.management-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.management-dialog::backdrop {
   background: color-mix(in srgb, #000 55%, transparent);
   backdrop-filter: blur(5px);
 }
 
-.provider-settings .modal-title {
-  margin: 0;
+.management-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
 }
 
-.provider-settings .modal-sub {
-  margin-bottom: 16px;
+.management-dialog .modal-title {
+  margin: 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.management-dialog .modal-title:focus {
+  outline: none;
+}
+
+.management-dialog .modal-sub,
+.management-help,
+.management-dialog .fhelp {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dim);
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.management-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: 0 24px 24px;
+  flex: 1;
+  scroll-padding-block: 24px 140px;
+}
+
+.management-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+  flex: none;
+}
+
+.management-footer .management-help {
+  flex: 1 1 240px;
+  margin: 0;
 }
 
 .provider-settings-list {
@@ -692,39 +756,633 @@ select.field {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
 }
 
 .provider-setting-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.provider-setting input {
-  width: 32px;
+.provider-setting .pname {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.management-tag {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.provider-setting-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.management-tag {
+  margin: 0;
+}
+
+.provider-setting-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+}
+
+.management-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.management-switch input[type="checkbox"] {
+  position: absolute;
+  width: 36px;
+  height: 24px;
+  opacity: 0;
+}
+
+.management-switch-track {
+  width: 36px;
+  height: 22px;
+  border: 1px solid var(--management-control-border);
+  border-radius: 999px;
+  background: var(--track);
+  flex: none;
+  padding: 3px;
+}
+
+.management-switch-track::after {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+
+.management-switch input:checked + .management-switch-track {
+  border-color: var(--management-success);
+  background: var(--management-success);
+}
+
+.management-switch input:checked + .management-switch-track::after {
+  transform: translateX(14px);
+  background: var(--panel);
+}
+
+.management-switch input:focus-visible + .management-switch-track {
+  outline: 2px solid var(--text);
+  outline-offset: 3px;
+}
+
+.management-switch:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.management-dialog input[type="checkbox"],
+.management-dialog input[type="radio"] {
+  width: 20px;
   height: 20px;
   flex: none;
-  cursor: pointer;
   accent-color: var(--good);
+  margin: 0;
+  cursor: pointer;
 }
 
-.provider-setting input:disabled {
-  cursor: wait;
+.management-action,
+.management-back,
+.management-link,
+.credential-reveal {
+  border: 1px solid var(--border2);
+  border-radius: 9px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+  font:
+    500 13px var(--font-space-grotesk),
+    sans-serif;
+  padding: 10px 13px;
+  min-height: 44px;
 }
 
-.provider-settings button:focus-visible,
-.provider-setting input:focus-visible {
+.management-action {
+  white-space: nowrap;
+}
+
+.management-back {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dim);
+  margin-bottom: 12px;
+}
+
+.management-link {
+  display: block;
+  margin-top: 12px;
+}
+
+.management-dialog .modal-close {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  color: var(--dim);
+}
+
+.management-dialog button:hover:not(:disabled) {
+  border-color: var(--dim);
+}
+
+.management-dialog button:disabled,
+.management-dialog input:disabled,
+.management-dialog select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.management-dialog button:focus-visible,
+.management-dialog input:focus-visible,
+.management-dialog select:focus-visible,
+.management-dialog summary:focus-visible {
   outline: 2px solid var(--dim);
-  outline-offset: 4px;
+  outline-offset: 3px;
+}
+
+.management-feedback {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px;
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--panel2);
+  margin: 16px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.management-feedback.error,
+.credential-error {
+  color: var(--management-danger);
+}
+
+.management-feedback.error {
+  border-color: var(--management-danger);
+}
+
+.credential-status {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.credential-status > p:first-child {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.credential-status > p:first-child > span {
+  color: var(--dim);
+}
+
+.management-dialog .flabel {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.management-dialog .field {
+  font-size: 16px;
+  min-height: 44px;
+  min-width: 0;
+  border-color: var(--management-control-border);
+}
+
+.management-dialog select.field {
+  appearance: auto;
+}
+
+.credential-saved {
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.credential-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.credential-input-row .field {
+  margin: 0;
+  flex: 1;
+  width: 0;
+}
+
+.credential-reveal {
+  padding: 8px 10px;
+  flex: none;
+}
+
+.credential-error {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.management-dialog [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.credential-advanced {
+  margin-top: 20px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.credential-advanced summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  min-height: 68px;
+  line-height: 1.5;
+}
+
+.credential-advanced summary::after {
+  content: "+";
+  font-size: 20px;
+  color: var(--dim);
+}
+
+.credential-advanced[open] summary::after {
+  content: "−";
+}
+
+.credential-advanced[open] {
+  padding-bottom: 20px;
+}
+
+.credential-advanced-hint {
+  display: block;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-top: 2px;
+}
+
+.credential-advanced-count {
+  margin-left: auto;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.credential-footer {
+  position: sticky;
+  bottom: -24px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 24px -24px -24px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.credential-footer-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.credential-footer-actions > button {
+  flex: 1 1 180px;
+  margin: 0;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+.credential-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.credential-section-heading {
+  margin-top: 24px;
+}
+
+.credential-section-heading h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.credential-section-heading .management-help {
+  margin-top: 4px;
+}
+
+.credential-field {
+  margin-top: 20px;
+}
+
+.credential-field-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.credential-required {
+  font-size: 12px;
+  color: var(--dim);
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.credential-import {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px dashed var(--management-control-border);
+  border-radius: 10px;
+}
+
+.credential-import select {
+  margin-top: 8px;
+}
+
+.credential-import .flabel:not(:first-child) {
+  margin-top: 16px;
+}
+
+.management-workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.management-detail {
+  width: min(940px, calc(100vw - 32px));
+  height: min(820px, calc(100dvh - 32px));
+}
+
+.management-title-tag {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--dim);
+  display: inline-block;
+  margin-left: 12px;
+}
+
+.management-nav {
+  width: 208px;
+  flex: none;
+  background: var(--panel2);
+  border-right: 1px solid var(--border);
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+
+.management-nav-label {
+  font-size: 13px;
+  color: var(--dim);
+  padding: 0 12px;
+  margin: 0 0 8px;
+}
+
+.management-nav-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  text-align: left;
+  color: var(--text);
+  padding: 12px;
+  font:
+    500 14px var(--font-space-grotesk),
+    sans-serif;
+  cursor: pointer;
+}
+
+.management-nav-item[aria-current="page"] {
+  background: var(--panel);
+  border-color: var(--management-control-border);
+}
+
+.management-nav-status {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.management-mobile-select {
+  display: none;
+}
+
+.management-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 0 4px;
+}
+
+.management-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.management-filters button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: var(--dim);
+  font:
+    500 14px var(--font-space-grotesk),
+    sans-serif;
+  cursor: pointer;
+}
+
+.management-filters button[aria-pressed="true"] {
+  color: var(--text);
+  background: var(--panel2);
+  border-color: var(--management-control-border);
+}
+
+.management-filters button span {
+  font:
+    400 12px var(--font-jetbrains-mono),
+    monospace;
+}
+
+.management-summary {
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.management-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+
+.management-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: var(--dim);
+  background: var(--panel2);
+}
+
+.management-badge.success {
+  color: var(--management-success);
+  background: color-mix(in srgb, var(--good) 8%, var(--panel));
+}
+
+.management-badge.error {
+  color: var(--management-danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel));
+}
+
+.management-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--dim);
+}
+
+.management-status-dot.success {
+  background: var(--management-success);
+}
+
+.management-status-dot.error {
+  background: var(--management-danger);
+}
+
+.management-last-fetch {
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.management-empty {
+  padding: 40px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--dim);
+}
+
+@media (max-width: 760px) {
+  .management-nav {
+    display: none;
+  }
+  .management-mobile-select {
+    display: block;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--dim);
+  }
 }
 
 @media (max-width: 480px) {
   .ctl {
     flex-wrap: wrap;
+  }
+
+  .management-header,
+  .management-footer {
+    padding: 16px;
+  }
+
+  .management-body {
+    padding: 0 16px 16px;
+  }
+
+  .provider-setting {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .provider-setting-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .management-title-tag {
+    display: block;
+    margin: 4px 0 0;
+  }
+  .credential-footer {
+    bottom: -16px;
+    margin-inline: -16px;
+    margin-bottom: -16px;
+    padding: 12px 16px 16px;
+  }
+  .management-filters button {
+    padding-inline: 9px;
+  }
+
+  .qcard > .row:first-child,
+  .qcard > .row:first-child > .row {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }

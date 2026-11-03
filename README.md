@@ -113,9 +113,13 @@ pnpm dev          # http://localhost:3000
 
 Prefer to do it by hand? `cp apps/web/.env.example apps/web/.env`, then put an `openssl rand -hex 32` value in `APP_ENC_KEY`.
 
-Open the page → click "+ Add credentials" → pick a provider, paste the key/token → save and it fetches immediately. The background poller refreshes every `POLL_INTERVAL_SECONDS` seconds.
+Sign in as an administrator and open **渠道管理** (Channels) to see each provider's enabled state, credential status, and usage-fetch result. Choose **配置凭据** (Configure credentials) or **管理凭据** (Manage credentials) to open its details. A dashboard card's Configure action opens the same detail view. The background poller refreshes enabled, configured providers every `POLL_INTERVAL_SECONDS` seconds.
 
 After signing in as an administrator, click **渠道管理** (Channels) in the header to disable or re-enable individual providers. Disabled providers are hidden from every visitor and skipped by both background polling and manual refresh; requests already in progress may finish. Credentials and history are retained. Settings persist in SQLite across page reloads and server restarts, including for providers without credentials. Updating credentials does not re-enable a disabled provider. Re-enabling restores its card immediately; usage updates on the next poll or manual refresh. `ENABLE_POLLER=false` still disables background polling globally.
+
+Enter the complete credentials and save directly; there is no save-mode selector. Saving an existing provider replaces its credentials, clears optional values left blank, and removes previous usage snapshots and history to avoid mixing tokens from different accounts. Unsaved input is cleared when switching providers, returning to the list, or closing the panel. Credentials are never written to browser storage.
+
+Disabled providers offer Save credentials without fetching, followed by **启用并获取用量** (Enable and fetch usage). Enabled providers also offer **重新获取用量** (Fetch usage again), so a failed fetch can be retried without resubmitting credentials.
 
 To inspect a provider response while debugging, set `DEBUG=true`. Raw quota API response bodies are written to the **server console** during each fetch and are never returned by the dashboard API. Do not enable this in production, because responses may contain account data.
 

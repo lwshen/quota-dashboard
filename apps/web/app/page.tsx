@@ -4,20 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import { Header } from "@/components/Header";
 import { LoginModal } from "@/components/LoginModal";
 import { ProviderCard, type ProviderView } from "@/components/ProviderCard";
-import { AddCredentialForm, type ProviderMeta } from "@/components/AddCredentialForm";
 import { ProviderSettings } from "@/components/ProviderSettings";
 
 export default function Home() {
   const [views, setViews] = useState<ProviderView[]>([]);
   const [usageLoaded, setUsageLoaded] = useState(false);
-  const [providers, setProviders] = useState<ProviderMeta[]>([]);
   const [authed, setAuthed] = useState(false);
   const [now, setNow] = useState(0);
 
   const [showLogin, setShowLogin] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [showProviderSettings, setShowProviderSettings] = useState(false);
-  const [formProvider, setFormProvider] = useState<string | null>(null);
+  const [managedProvider, setManagedProvider] = useState<string | undefined>();
   const [refreshing, setRefreshing] = useState(false);
 
   const loadUsage = useCallback(async () => {
@@ -50,10 +47,6 @@ export default function Home() {
 
   useEffect(() => {
     loadSession();
-    fetch("/api/providers")
-      .then((r) => r.json())
-      .then((j) => setProviders(j.providers ?? []))
-      .catch(() => {});
     loadUsage();
     const t = setInterval(loadUsage, 15_000);
     return () => clearInterval(t);
@@ -69,9 +62,9 @@ export default function Home() {
     }
   }, [loadUsage]);
 
-  function openForm(provider?: string) {
-    setFormProvider(provider ?? null);
-    setShowForm(true);
+  function openManagement(provider?: string) {
+    setManagedProvider(provider);
+    setShowProviderSettings(true);
   }
 
   async function logout() {
@@ -79,7 +72,6 @@ export default function Home() {
       await fetch("/api/logout", { method: "POST" });
     } finally {
       setAuthed(false);
-      setShowForm(false);
       setShowProviderSettings(false);
       // Re-fetch so account identity (balance / email) drops from the public view.
       loadUsage();
@@ -100,8 +92,7 @@ export default function Home() {
           refreshing={refreshing}
           onOpenLogin={() => setShowLogin(true)}
           onRefresh={refreshNow}
-          onAddCredential={() => openForm()}
-          onManageProviders={() => setShowProviderSettings(true)}
+          onManageProviders={() => openManagement()}
           onLogout={logout}
         />
 
@@ -117,7 +108,7 @@ export default function Home() {
               view={v}
               now={now}
               authed={authed}
-              onConfigure={authed ? openForm : undefined}
+              onConfigure={authed ? openManagement : undefined}
             />
           ))}
         </div>
@@ -126,19 +117,7 @@ export default function Home() {
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLoginSuccess} />}
 
       {authed && showProviderSettings && (
-        <ProviderSettings onClose={() => setShowProviderSettings(false)} onChanged={loadUsage} />
-      )}
-
-      {authed && showForm && (
-        <AddCredentialForm
-          providers={providers}
-          initialProvider={formProvider ?? undefined}
-          onSaved={() => {
-            setShowForm(false);
-            loadUsage();
-          }}
-          onClose={() => setShowForm(false)}
-        />
+        <ProviderSettings initialProvider={managedProvider} onClose={() => setShowProviderSettings(false)} onChanged={loadUsage} />
       )}
     </div>
   );

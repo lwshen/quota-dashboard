@@ -54,9 +54,9 @@ export function saveCredential(provider: UsageProvider, mode: SourceMode, creds:
          mode=excluded.mode, data=excluded.data, updated_at=excluded.updated_at, enabled=1`,
     )
     .run(provider, mode, encrypt(JSON.stringify(creds)), now.toISOString());
-  // The new credential may belong to a different account; the old account's history
-  // must not seed reset-notification comparisons.
+  // Never show or compare a previous account's usage after replacement.
   db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
+  db().prepare(`DELETE FROM snapshots WHERE provider=?`).run(provider);
 }
 
 export function updateCredentialSecret(provider: UsageProvider, creds: ProviderCredentials, now: Date, revision: string): string | null {

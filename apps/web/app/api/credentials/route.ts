@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { ProviderCredentials, SourceMode } from "@quota/core";
 import { getDescriptor, isProvider } from "@quota/core";
-import { deleteCredential, getCredential, listCredentials, saveCredential } from "@/lib/store";
+import { deleteCredential, getCredential, listCredentials, listSnapshots, saveCredential, updateCredentialSecret } from "@/lib/store";
+import { CredentialInputError, prepareCredentialInput } from "@/lib/credential-input";
 import { fetchAndStore } from "@/lib/fetcher";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
 import { normalizeGrokCredentials } from "@quota/core/grok-auth";
@@ -11,48 +12,63 @@ export const dynamic = "force-dynamic";
 
 // Never return any secret.
 export async function GET() {
+  const snapshots = new Map(listSnapshots().map((s) => [s.provider, s]));
   const credentials = listCredentials().map((c) => ({
     provider: c.provider,
     enabled: c.enabled,
     mode: c.mode,
-    configuredKeys: Object.entries(c.credentials)
-      .filter(([, v]) => v != null && v !== "")
-      .map(([k]) => k),
+    configuredKeys: getDescriptor(c.provider).credentialFields
+      .filter((field) => {
+        const value = field.key.startsWith("extra.") ? c.credentials.extra?.[field.key.slice(6)]
+          : c.credentials[field.key as keyof ProviderCredentials];
+        return value != null && value !== "";
+      })
+      .map((field) => field.key),
     updatedAt: c.updatedAt,
+    fetchedAt: snapshots.get(c.provider)?.fetchedAt ?? null,
+    fetchError: snapshots.get(c.provider)?.error ?? null,
   }));
   return NextResponse.json({ credentials });
 }
 
 export async function POST(req: Request) {
-  let body: { provider?: string; mode?: string; fields?: Record<string, unknown> };
+  let body: { provider?: string; mode?: SourceMode; fields?: Record<string, unknown>; action?: "update" | "replace"; clearFields?: string[]; confirmSameAccount?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body) ||
+    (body.fields != null && (typeof body.fields !== "object" || Array.isArray(body.fields))) ||
+    (body.action != null && body.action !== "update" && body.action !== "replace") ||
+    (body.mode != null && !["auto", "api", "oauth", "web"].includes(body.mode)) ||
+    (body.clearFields != null && (!Array.isArray(body.clearFields) || body.clearFields.some((key) => typeof key !== "string")))) {
+    return NextResponse.json({ error: "凭据请求格式不正确" }, { status: 400 });
+  }
   const provider = body.provider ?? "";
   if (!isProvider(provider)) return NextResponse.json({ error: "unknown provider" }, { status: 400 });
 
   const desc = getDescriptor(provider);
-  const mode = (body.mode as SourceMode) ?? "auto";
+  const existing = getCredential(provider);
+  if (body.action === "update" && body.mode != null && body.mode !== existing?.mode) {
+    return NextResponse.json({ error: "修改数据源模式时请替换整套凭据" }, { status: 400 });
+  }
+  const mode = body.mode ?? (body.action === "update" ? existing?.mode : undefined) ?? "auto";
   const fields = body.fields ?? {};
 
-  let creds: ProviderCredentials = {};
-  const extra: Record<string, string> = {};
-  for (const f of desc.credentialFields) {
-    const val = fields[f.key];
-    if (val == null || val === "") {
-      if (f.required) return NextResponse.json({ error: `缺少必填字段: ${f.label}` }, { status: 400 });
-      continue;
+  let creds: ProviderCredentials;
+  try {
+    creds = prepareCredentialInput(desc, fields, {
+      action: body.action ?? "replace", existing: existing?.credentials,
+      clearFields: body.clearFields ?? [], confirmSameAccount: body.confirmSameAccount === true,
+    });
+  } catch (error) {
+    if (error instanceof CredentialInputError) {
+      return NextResponse.json({ error: error.message, fieldErrors: error.fieldErrors }, { status: 400 });
     }
-    if (typeof f.key === "string" && f.key.startsWith("extra.")) {
-      extra[f.key.slice(6)] = String(val);
-    } else {
-      (creds as Record<string, unknown>)[f.key] = String(val);
-    }
+    throw error;
   }
-  if (Object.keys(extra).length) creds.extra = extra;
 
   if (provider === "grok") {
     try { creds = normalizeGrokCredentials(creds); } catch (error) {
@@ -70,7 +86,13 @@ export async function POST(req: Request) {
   }
 
   const now = new Date();
-  saveCredential(provider, mode, creds, now);
+  if (body.action === "update") {
+    if (!existing || !updateCredentialSecret(provider, creds, now, existing.revision)) {
+      return NextResponse.json({ error: "凭据已被其他请求更新，请重新打开配置后重试" }, { status: 409 });
+    }
+  } else {
+    saveCredential(provider, mode, creds, now);
+  }
   if (!getCredential(provider)?.enabled) return NextResponse.json({ ok: true, disabled: true });
   const result = await fetchAndStore(provider);
   return NextResponse.json({ ok: true, result });
