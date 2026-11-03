@@ -914,6 +914,7 @@ select.field {
 
 .management-dialog button:disabled,
 .management-dialog input:disabled,
+.management-dialog textarea:disabled,
 .management-dialog select:disabled {
   opacity: 0.6;
   cursor: default;
@@ -921,6 +922,7 @@ select.field {
 
 .management-dialog button:focus-visible,
 .management-dialog input:focus-visible,
+.management-dialog textarea:focus-visible,
 .management-dialog select:focus-visible,
 .management-dialog summary:focus-visible {
   outline: 2px solid var(--dim);
@@ -1144,6 +1146,16 @@ select.field {
 
 .credential-import select {
   margin-top: 8px;
+}
+
+.credential-import-methods {
+  margin: 16px 0;
+}
+
+.credential-json-source {
+  resize: vertical;
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  margin-bottom: 8px;
 }
 
 .credential-import .flabel:not(:first-child) {

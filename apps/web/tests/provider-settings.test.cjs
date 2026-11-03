@@ -218,3 +218,29 @@ test("credential editing preserves same-account values, requires explicit replac
     });
   } finally { f.close(); }
 });
+
+test("imported Codex and Claude credentials save through the existing API without retaining old optional tokens", async () => {
+  const f = fixture();
+  try {
+    const store = f.load("lib/store.ts");
+    const route = f.load("app/api/credentials/route.ts");
+    const { parseCredentialJson } = f.load("lib/credential-import.ts");
+    for (const provider of ["codex", "codex2", "claude"]) {
+      store.setProviderEnabled(provider, false);
+      store.saveCredential(provider, "auto", { bearerToken: "previous-access", refreshToken: "previous-refresh", accountId: "previous-account" }, new Date());
+      const source = provider === "claude"
+        ? { claudeAiOauth: { accessToken: "imported-access", refreshToken: "imported-refresh" }, mcpOAuth: { secret: "never-submit" } }
+        : { tokens: { access_token: "imported-access", refresh_token: "imported-refresh", account_id: "imported-account", id_token: "never-submit" } };
+      const save = (fields) => route.POST(new Request("http://localhost/api/credentials", {
+        method: "POST", body: JSON.stringify({ provider, action: "replace", fields }),
+      }));
+      const fields = parseCredentialJson(provider, JSON.stringify(source));
+      assert.doesNotMatch(JSON.stringify(fields), /never-submit/);
+      assert.equal((await save(fields)).status, 200);
+      assert.deepEqual(store.getCredential(provider).credentials, fields);
+      assert.equal((await save(parseCredentialJson(provider, '{"bearerToken":"access-only"}'))).status, 200);
+      assert.deepEqual(store.getCredential(provider).credentials, { bearerToken: "access-only" });
+    }
+    assert.equal(f.networkCalls, 0);
+  } finally { f.close(); }
+});
