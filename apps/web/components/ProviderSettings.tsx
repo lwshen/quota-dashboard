@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useModalDialog } from "@/lib/hooks";
 import { splitLabel } from "@/lib/format";
-import { credentialStatus, emptyDraft, hasDraftChanges, type CredentialDraft, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
+import { credentialStatus, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
 import { AddCredentialForm } from "./AddCredentialForm";
 
 export function ProviderSettings({ initialProvider, onClose, onChanged }: {
@@ -14,7 +14,6 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
   const [providers, setProviders] = useState<ProviderMeta[]>([]);
   const [credentials, setCredentials] = useState<CredentialMeta[]>([]);
   const [selected, setSelected] = useState<string | null>(initialProvider ?? null);
-  const [drafts, setDrafts] = useState<Record<string, CredentialDraft>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +129,7 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
         <div>
           {selected && <button type="button" className="management-back" disabled={busy} onClick={() => setSelected(null)}>← 返回渠道列表</button>}
           <h2 ref={title} tabIndex={-1} className="modal-title" id="provider-settings-title">{provider ? splitLabel(provider.label).name : "渠道管理"}{provider && <span className="management-title-tag">{splitLabel(provider.label).tag}</span>}</h2>
-          <p className="modal-sub">{provider ? "配置凭据并查看用量获取结果。切换渠道时保留未保存的输入。" : "管理服务凭据和用量获取状态。渠道开关即时保存，对所有访客生效。"}</p>
+          <p className="modal-sub">{provider ? "配置凭据并查看用量获取结果。" : "管理服务凭据和用量获取状态。渠道开关即时保存，对所有访客生效。"}</p>
         </div>
         <button type="button" className="modal-close" aria-label="关闭渠道管理" disabled={busy} onClick={onClose}>✕</button>
       </header>
@@ -140,13 +139,13 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
           {providers.map((p) => {
             const status = credentialStatus(credentials.find((c) => c.provider === p.provider));
             return <button type="button" key={p.provider} className="management-nav-item" aria-current={selected === p.provider ? "page" : undefined} disabled={busy} onClick={() => open(p.provider)}>
-              <span>{splitLabel(p.label).name}<span className="management-nav-status">{hasDraftChanges(drafts[p.provider]) ? "未保存" : !p.enabled ? "已停用" : status.label}</span></span>
+              <span>{splitLabel(p.label).name}<span className="management-nav-status">{!p.enabled ? "已停用" : status.label}</span></span>
               <span className={`management-status-dot ${!p.enabled ? "muted" : status.tone}`} aria-hidden="true" />
             </button>;
           })}
         </nav>}
       <div className="management-body" aria-busy={loading}>
-        {provider && <div className="management-mobile-select"><label htmlFor="management-provider">切换渠道</label><select id="management-provider" className="field" value={provider.provider} disabled={busy} onChange={(event) => open(event.target.value)}>{providers.map((p) => <option key={p.provider} value={p.provider}>{p.label}{hasDraftChanges(drafts[p.provider]) ? " · 未保存" : ""}</option>)}</select></div>}
+        {provider && <div className="management-mobile-select"><label htmlFor="management-provider">切换渠道</label><select id="management-provider" className="field" value={provider.provider} disabled={busy} onChange={(event) => open(event.target.value)}>{providers.map((p) => <option key={p.provider} value={p.provider}>{p.label}</option>)}</select></div>}
         {loading && <p className="management-help" role="status">加载渠道设置…</p>}
         {error && <div className="management-feedback error" role="alert">{error}<button type="button" className="management-link" disabled={busy} onClick={retryLoad}>重新加载</button></div>}
         {notice && <p className="management-feedback" role="status">{notice}</p>}
@@ -164,7 +163,7 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
               return (
                 <section className="provider-setting" key={p.provider} aria-label={p.label}>
                   <div className="provider-setting-info">
-                    <div className="provider-setting-heading"><h3 className="pname">{name}{hasDraftChanges(drafts[p.provider]) && <span className="management-draft">未保存</span>}</h3><p className="management-tag">{tag}</p></div>
+                    <div className="provider-setting-heading"><h3 className="pname">{name}</h3><p className="management-tag">{tag}</p></div>
                     <div className="management-status-row"><span className={`management-badge ${status.tone}`}><span className={`management-status-dot ${status.tone}`} aria-hidden="true" />{status.label}</span>{saved?.fetchedAt && <span className="management-last-fetch">最近获取 {new Date(saved.fetchedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>}</div>
                   </div>
                   <div className="provider-setting-actions">
@@ -184,8 +183,6 @@ export function ProviderSettings({ initialProvider, onClose, onChanged }: {
         )}
         {!loading && provider && (
           <AddCredentialForm key={provider.provider} provider={provider} credential={credential}
-            draft={drafts[provider.provider] ?? emptyDraft()}
-            onDraftChange={(draft) => setDrafts((previous) => ({ ...previous, [provider.provider]: draft }))}
             onBusyChange={setBusy} onSaved={changed} />
         )}
       </div>

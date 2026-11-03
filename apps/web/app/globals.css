@@ -1094,12 +1094,6 @@ select.field {
   font-size: 14px;
 }
 
-.credential-draft-note {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--dim);
-}
-
 .credential-status-heading {
   display: flex;
   align-items: center;
@@ -1326,12 +1320,6 @@ select.field {
 .management-last-fetch {
   font-size: 12px;
   color: var(--dim);
-}
-
-.management-draft {
-  color: var(--management-warning);
-  font-size: 12px;
-  font-weight: 400;
 }
 
 .management-empty {

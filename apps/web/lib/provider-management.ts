@@ -22,21 +22,9 @@ export interface CredentialMeta {
   fetchError: string | null;
 }
 
-export interface CredentialDraft {
-  fields: Record<string, string>;
-}
-
-export function emptyDraft(): CredentialDraft {
-  return { fields: {} };
-}
-
 export function credentialStatus(credential?: CredentialMeta) {
   if (!credential) return { label: "待配置", tone: "muted" };
   if (credential.fetchError) return { label: "获取失败", tone: "error" };
   if (credential.fetchedAt) return { label: "已获取用量", tone: "success" };
   return { label: "待获取用量", tone: "muted" };
-}
-
-export function hasDraftChanges(draft?: CredentialDraft) {
-  return !!draft && Object.values(draft.fields).some((value) => value.trim());
 }

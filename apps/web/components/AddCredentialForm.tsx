@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseGrokAuthFile, type GrokAuthImport } from "@quota/core/grok-auth";
-import { credentialStatus, emptyDraft, hasDraftChanges, type CredentialDraft, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
+import { credentialStatus, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
 
-export function AddCredentialForm({ provider, credential, draft, onDraftChange, onBusyChange, onSaved }: {
+export function AddCredentialForm({ provider, credential, onBusyChange, onSaved }: {
   provider: ProviderMeta;
   credential?: CredentialMeta;
-  draft: CredentialDraft;
-  onDraftChange: (draft: CredentialDraft) => void;
   onBusyChange: (busy: boolean) => void;
   onSaved: () => Promise<void>;
 }) {
+  const [fields, setFields] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -19,7 +18,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
   const [accounts, setAccounts] = useState<GrokAuthImport[]>([]);
   const [scope, setScope] = useState("");
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
-  const [advanced, setAdvanced] = useState(Object.keys(draft.fields).some((key) => key !== "bearerToken" && key !== "accountId"));
+  const [advanced, setAdvanced] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const feedbackRef = useRef<HTMLParagraphElement>(null);
   const mainFields = provider.credentialFields.filter((f) => f.required || f.key === "accountId");
@@ -41,7 +40,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
   }
 
   function changeField(key: string, value: string) {
-    onDraftChange({ fields: { ...draft.fields, [key]: value } });
+    setFields((previous) => ({ ...previous, [key]: value }));
     setErrors((previous) => { const next = { ...previous }; delete next[key]; return next; });
     setFeedback(null);
   }
@@ -56,7 +55,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
     if (pending.current) return;
     const invalid: Record<string, string> = {};
     for (const field of provider.credentialFields) {
-      if (field.required && !draft.fields[field.key]?.trim()) {
+      if (field.required && !fields[field.key]?.trim()) {
         invalid[field.key] = `请填写 ${field.label}`;
       }
     }
@@ -70,7 +69,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
     try {
       const res = await fetch("/api/credentials", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: provider.provider, fields: draft.fields, action: "replace" }),
+        body: JSON.stringify({ provider: provider.provider, fields, action: "replace" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -78,7 +77,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
         if (Object.keys(data.fieldErrors ?? {}).some((key) => extraFields.some((f) => f.key === key))) setAdvanced(true);
         throw new Error(data.error ?? "保存失败，请重试");
       }
-      onDraftChange(emptyDraft());
+      setFields({});
       setRevealed({});
       setAccounts([]);
       setScope("");
@@ -121,7 +120,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
   }
 
   function applyImport(account: GrokAuthImport) {
-    onDraftChange({ fields: account.fields });
+    setFields(account.fields);
     setAdvanced(true);
     setErrors({});
     setFeedback({ text: "已读取账户凭据，请检查后保存。" });
@@ -137,7 +136,7 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
         <div className="credential-input-row">
           <input id={id} name={field.key} className="field" type={field.secret && !revealed[field.key] ? "password" : "text"}
             placeholder={field.placeholder}
-            value={draft.fields[field.key] ?? ""} disabled={busy} autoComplete="off" spellCheck={false}
+            value={fields[field.key] ?? ""} disabled={busy} autoComplete="off" spellCheck={false}
             required={field.required} aria-invalid={!!errors[field.key]}
             aria-describedby={`${id}-help${errors[field.key] ? ` ${id}-error` : ""}`}
             onChange={(event) => changeField(field.key, event.target.value)} />
@@ -190,7 +189,6 @@ export function AddCredentialForm({ provider, credential, draft, onDraftChange, 
       </details>}
       {feedback && <p ref={feedbackRef} className={`management-feedback${feedback.error ? " error" : ""}`} role={feedback.error ? "alert" : "status"}>{feedback.text}</p>}
       <div className="credential-footer">
-        <span className="credential-draft-note">{hasDraftChanges(draft) ? "有未保存的更改 · 关闭面板后丢弃" : "未保存的输入仅在本次管理会话保留"}</span>
         <div className="credential-footer-actions">
         {credential && <button type="button" className="btn-ghost" disabled={busy} onClick={() => fetchUsage(!provider.enabled)}>{provider.enabled ? "重新获取用量" : "启用并获取用量"}</button>}
         <button type="submit" className="btn-primary" disabled={busy || (accounts.length > 1 && !scope)}>{busy ? "处理中…" : provider.enabled ? "保存并获取用量" : "保存凭据"}</button>
