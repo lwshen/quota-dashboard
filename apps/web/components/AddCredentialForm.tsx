@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseGrokAuthFile, type GrokAuthImport } from "@quota/core/grok-auth";
 import { credentialStatus, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
+import { CredentialJsonImport } from "./CredentialJsonImport";
 
 export function AddCredentialForm({ provider, credential, onBusyChange, onSaved }: {
   provider: ProviderMeta;
@@ -119,8 +120,9 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
     }
   }
 
-  function applyImport(account: GrokAuthImport) {
-    setFields(account.fields);
+  function applyImport(imported: Record<string, string>) {
+    setFields(imported);
+    setRevealed({});
     setAdvanced(true);
     setErrors({});
     setFeedback({ text: "已读取账户凭据，请检查后保存。" });
@@ -158,6 +160,9 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
         {credential?.fetchError && <p className="credential-error">上次获取失败：{credential.fetchError}</p>}
         {!provider.enabled && <p className="management-help">停用期间仅保存凭据，不会获取用量。启用后才会恢复显示和刷新。</p>}
       </section>
+      {(provider.provider === "codex" || provider.provider === "codex2" || provider.provider === "claude") &&
+        <CredentialJsonImport provider={provider.provider} busy={busy} onBusyChange={setWorking}
+          onImported={applyImport} />}
       {provider.provider === "grok" && <section className="credential-import">
         <label className="flabel" htmlFor="grok-auth-file">导入 Grok auth.json</label>
         <input id="grok-auth-file" className="field" type="file" accept=".json,application/json" disabled={busy} aria-describedby="grok-import-help"
@@ -171,14 +176,14 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
               const single = imported.length === 1 ? imported[0] : undefined;
               setAccounts(imported);
               setScope(single?.scope ?? "");
-              if (single) applyImport(single);
+              if (single) applyImport(single.fields);
               else setFeedback({ text: "已找到多个账户，请选择要导入的账户。" });
             } catch (e) { setFeedback({ text: e instanceof Error ? e.message : "导入失败，请重新选择文件", error: true }); }
             finally { input.value = ""; setWorking(false); }
           }} />
         <p className="fhelp" id="grok-import-help">先运行 grok login，再选择 ~/.grok/auth.json。文件在浏览器内解析，仅提交所选账户的凭据。</p>
         {accounts.length > 1 && <><label className="flabel" htmlFor="grok-account">选择 Grok 账户</label><select id="grok-account" className="field" value={scope} disabled={busy}
-          onChange={(event) => { setScope(event.target.value); const account = accounts.find((a) => a.scope === event.target.value); if (account) applyImport(account); }}>
+          onChange={(event) => { setScope(event.target.value); const account = accounts.find((a) => a.scope === event.target.value); if (account) applyImport(account.fields); }}>
           <option value="">请选择账户</option>{accounts.map((account) => <option key={account.scope} value={account.scope}>{account.label}</option>)}
         </select></>}
       </section>}

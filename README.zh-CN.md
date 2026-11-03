@@ -51,7 +51,7 @@ quota-dashboard/
 | **Grok**     | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                | 额度用量、重置时间、产品明细、套餐及预付余额  |
 | **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | 余额（无窗口）                                |
 
-凭据获取方式见各 `providers/*.ts` 顶部注释。Claude/Codex 的 token 可从本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 复制粘贴。
+凭据获取方式见各 `providers/*.ts` 顶部注释。在渠道配置中，Claude 和两个 Codex 槽位均支持选择 JSON 文件或粘贴 JSON 字符串，可使用本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 的完整内容、其中的 `claudeAiOauth` / `tokens` 对象，或扁平的 Token 对象。导入后会填入表单供检查，包含可用的 Refresh Token 和 Codex Account ID，检查后再保存。JSON 在浏览器内解析（最大 1 MB），保存时仅提交支持的凭据字段，也可继续手动填写。
 
 Kimi 会话窗口按 API 实际时长显示，各窗口独立标记未知用量。Claude 模型周限额即使报告 `is_active=false` 也会显示，并按模型身份区分配额，避免误判重置。
 

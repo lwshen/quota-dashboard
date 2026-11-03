@@ -51,7 +51,7 @@ quota-dashboard/
 | **Grok**     | CLI billing proxy, with bearer gRPC-web fallback         | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance  |
 | **RightAPI** | account (`www.rightapi.ai/auth/me`)                      | user token                           | Balance (no window)                                                  |
 
-See the comment at the top of each `providers/*.ts` for how to obtain credentials. Claude/Codex tokens can be copy-pasted from your local `~/.claude/.credentials.json` and `~/.codex/auth.json`.
+See the comment at the top of each `providers/*.ts` for how to obtain credentials. In channel settings, Claude and both Codex slots support importing a JSON file or pasting a JSON string from `~/.claude/.credentials.json` or `~/.codex/auth.json`. Full credential files, their `claudeAiOauth` / `tokens` objects, and flat token objects are supported. Imports fill the form for review before saving, including refresh tokens and Codex account IDs when present. Parsing happens in the browser (1 MB maximum); only supported credential fields are submitted when you save. Manual entry remains available.
 
 Kimi session labels follow the API's actual duration. Missing usage stays unknown for each window independently. Claude model-scoped weekly limits are displayed even when their `is_active` flag is false; model identity keeps separate quotas from being compared as resets.
 
