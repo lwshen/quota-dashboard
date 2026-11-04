@@ -56,6 +56,8 @@ export function ProviderCard({
   const maxUsed = metered.length ? Math.max(...metered) : null;
   const loginText = s?.identity?.loginMethod ?? null;
   const email = s?.identity?.accountEmail ?? null;
+  const resetCreditsExpireAt = s?.identity?.resetCreditsExpireAt;
+  const resetCreditsExpiry = resetCreditsExpireAt ? new Date(resetCreditsExpireAt) : null;
   const cost = s?.providerCost ?? null;
 
   const hasValueData = !!loginText || !!cost;
@@ -129,6 +131,15 @@ export function ProviderCard({
               : "登录以查看 · sign in to view"}
         </div>
       )}
+
+      {resetCreditsExpiry && !Number.isNaN(resetCreditsExpiry.getTime()) ? (
+        <div className="subident">
+          重置次数最近到期：<time dateTime={resetCreditsExpiry.toISOString()}>{resetCreditsExpiry.toLocaleString("zh-CN", {
+            year: "numeric", month: "2-digit", day: "2-digit",
+            hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZoneName: "short",
+          })}</time>
+        </div>
+      ) : null}
 
       {s?.usageBreakdown?.length ? (
         <div className="cost">

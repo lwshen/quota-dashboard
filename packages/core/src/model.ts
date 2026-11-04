@@ -45,6 +45,8 @@ export interface ProviderIdentitySnapshot {
   accountOrganization?: string | null;
   /** Also reused to stash plain text like "Credits: 1234" / "Balance: $5.00". */
   loginMethod?: string | null;
+  /** Earliest expiration among available, unexpired Codex reset credits. */
+  resetCreditsExpireAt?: string | null;
 }
 
 export interface UsageSnapshot {

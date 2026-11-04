@@ -11,6 +11,7 @@ import { codexCredits } from "./codex-credits";
 import { decodeRefreshResponse } from "./oauth-refresh";
 
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
+const RESET_CREDITS_URL = "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits";
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 // Identify as the Codex CLI (its originator is codex_cli_rs); the endpoint doesn't validate the value.
@@ -19,6 +20,30 @@ const USER_AGENT = "codex_cli_rs/0.142.4";
 interface WindowParsed {
   window: RateWindow;
   minutes: number | null;
+}
+
+async function resetCreditsExpiry(
+  availableCount: number | undefined, headers: Record<string, string>, ctx: FetchContext,
+): Promise<string | null> {
+  if (availableCount == null || availableCount <= 0) return null;
+  try {
+    const res = await ctx.http.get(RESET_CREDITS_URL, headers, { timeoutMs: 6_000, retry: false });
+    if (res.status !== 200) return null;
+    const details = asRecord(safeJson(res.body));
+    if (!Array.isArray(details?.credits)) return null;
+    let earliest: string | null = null;
+    for (const value of details.credits) {
+      const credit = asRecord(value);
+      if (credit?.status !== "available") continue;
+      const expiresAt = parseIsoOrUnix(credit.expires_at);
+      if (!expiresAt || Date.parse(expiresAt) <= ctx.now.getTime()) continue;
+      if (!earliest || Date.parse(expiresAt) < Date.parse(earliest)) earliest = expiresAt;
+    }
+    return earliest;
+  } catch {
+    // Optional reset details must not discard usable quota or the summary count.
+    return null;
+  }
 }
 
 function windowFrom(node: unknown): WindowParsed | null {
@@ -108,6 +133,7 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
       const resetCredits = asRecord(j.rate_limit_reset_credits);
       const resetCount = num(resetCredits?.available_count);
       const applicableResetCount = num(resetCredits?.applicable_available_count);
+      const resetCreditsExpireAt = await resetCreditsExpiry(resetCount, headers, ctx);
       const identityDetails = [
         planType ? `Plan: ${planType}` : null,
         resetCount != null ? `重置次数: ${resetCount}` : null,
@@ -120,7 +146,9 @@ function makeCodexOAuthStrategy(provider: UsageProvider): ProviderFetchStrategy 
         tertiary: null,
         extraRateWindows: extra.length ? extra : null,
         providerCost: cost,
-        identity: identityDetails.length ? { providerID: provider, loginMethod: identityDetails.join(" · ") } : null,
+        identity: identityDetails.length ? {
+          providerID: provider, loginMethod: identityDetails.join(" · "), resetCreditsExpireAt,
+        } : null,
         dataConfidence: primary || secondary || extra.length || cost ? "exact" : "unknown",
         updatedAt: ctx.now.toISOString(),
       };
