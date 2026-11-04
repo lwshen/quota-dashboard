@@ -68,3 +68,23 @@ test("card shows zero credits as zero and preserves both monthly quota and indep
   assert.equal(formatCost({ limit: 25, used: 0, currencyCode: "USD", period: "Credits balance" }), "25.00 USD");
   assert.equal(formatCost({ limit: 0, used: 0, currencyCode: "USD", period: "Credits balance" }), "0.00 USD");
 });
+
+test("Codex cards show reset-credit expiry in local time with and without quota windows", () => {
+  const expiresAt = "2026-11-10T12:00:00.000Z";
+  for (const provider of ["codex", "codex2"]) {
+    for (const primary of [null, { usedPercent: 25, windowMinutes: 300 }]) {
+      const snapshot = { provider, primary, secondary: null, tertiary: null, dataConfidence: "exact",
+        identity: { loginMethod: "Plan: pro · 重置次数: 2", resetCreditsExpireAt: expiresAt } };
+      const html = render(snapshot);
+      assert.match(html, /重置次数最近到期：/);
+      assert.match(html, /<time dateTime="2026-11-10T12:00:00.000Z">/);
+      assert.ok(html.includes(new Date(expiresAt).toLocaleString("zh-CN", {
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        second: "2-digit", hour12: false, timeZoneName: "short",
+      })));
+      for (const resetCreditsExpireAt of [undefined, null, "invalid"]) {
+        assert.doesNotMatch(render({ ...snapshot, identity: { ...snapshot.identity, resetCreditsExpireAt } }), /重置次数最近到期/);
+      }
+    }
+  }
+});

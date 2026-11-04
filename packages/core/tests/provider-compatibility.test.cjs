@@ -123,6 +123,51 @@ test("Codex classifies reversed Spark windows by actual duration", async () => {
   assert.deepEqual(s.extraRateWindows.map((w) => w.id), ["codex-spark-weekly", "codex-spark"]);
 });
 
+test("Codex accounts fetch the earliest expiry of available reset credits with the same account", async () => {
+  for (const provider of ["codex", "codex2"]) {
+    const { snapshot: s, calls } = await fetch(provider, {
+      rate_limit_reset_credits: { available_count: 3, applicable_available_count: 0 },
+    }, { accountId: "test-account" }, { credits: [
+      { status: "available", expires_at: "2026-11-10T12:00:00Z" },
+      { status: "redeemed", expires_at: "2026-10-26T12:00:00Z" },
+      { status: "redeeming", expires_at: "2026-10-26T12:00:00Z" },
+      { status: "available", expires_at: now.toISOString() },
+      { status: "available", expires_at: "2026-10-24T12:00:00Z" },
+      { status: "available", expires_at: null },
+      null, { status: "available", expires_at: "invalid" },
+      { status: "available", expires_at: reset },
+    ] });
+    assert.equal(s.identity.resetCreditsExpireAt, reset);
+    assert.equal(s.identity.loginMethod, "重置次数: 3 · 当前可用: 0");
+    assert.equal(calls[1][0], "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits");
+    assert.deepEqual(calls[1][1], calls[0][1]);
+    assert.equal(calls[1][1]["ChatGPT-Account-Id"], "test-account");
+    assert.deepEqual(calls[1][2], { timeoutMs: 6000, retry: false });
+  }
+});
+
+test("Codex skips reset details without a positive available count", async () => {
+  for (const available_count of [undefined, null, 0, -1, true, "bad"]) {
+    const { snapshot: s, calls } = await fetch("codex", {
+      rate_limit_reset_credits: { available_count }, plan_type: "pro",
+    });
+    assert.equal(calls.length, 1);
+    assert.equal(s.identity.resetCreditsExpireAt, null);
+  }
+});
+
+test("Codex optional reset-detail failures preserve quota and reset counts", async () => {
+  for (const response of [new Error("timeout"), { status: 401 }, { status: 429 }, { status: 500 },
+    { body: {} }, { credits: false }, { credits: [null, { status: "available", expires_at: null }] }]) {
+    const { snapshot: s } = await fetch("codex", {
+      rate_limit: { primary_window: window(18000, 15) }, rate_limit_reset_credits: { available_count: "2" },
+    }, {}, response);
+    assert.equal(s.primary.usedPercent, 15);
+    assert.equal(s.identity.loginMethod, "重置次数: 2");
+    assert.equal(s.identity.resetCreditsExpireAt, null);
+  }
+});
+
 test("Codex credits retain their native unit and explicitly represent zero balance", async () => {
   for (const balance of ["25", "0"]) {
     const { snapshot: s } = await fetch("codex", { credits: { has_credits: true, unlimited: false, balance } });
