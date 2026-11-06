@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type { RateWindow, UsageFetchIssue, UsageProvider, UsageSnapshot } from "@quota/core";
-import { laneMeta } from "../format";
-import { getAlertState, saveAlertState } from "../store";
-import { buildAlertMessage } from "./message";
-import type { NotifyChannel, NotifyMessage } from "./types";
+import { laneMeta } from "@/shared/format";
+import { getAlertState, saveAlertState } from "@/server/storage";
+import { buildAlertMessage } from "@/server/notify/message";
+import type { NotifyChannel, NotifyMessage } from "@/server/notify/types";
 
 export interface AlertOptions {
   usageThresholds: number[];

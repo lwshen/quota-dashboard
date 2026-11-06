@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isProvider } from "@quota/core";
-import { createAccount, deleteAccount, getAccount, listAccounts, updateAccount } from "@/lib/store";
+import { createAccount, deleteAccount, getAccount, listAccounts, updateAccount } from "@/server/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

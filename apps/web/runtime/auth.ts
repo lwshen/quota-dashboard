@@ -1,6 +1,6 @@
 // Shared by the edge + node runtimes, so only Web Crypto / btoa / TextEncoder are used.
 
-import { ENV } from "./env";
+import { ENV } from "@/runtime/env";
 
 export const SESSION_COOKIE = "qd_session";
 const TTL_SECONDS = 7 * 24 * 3600;

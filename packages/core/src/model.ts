@@ -16,10 +16,6 @@ export interface RateWindow {
   sourceKey?: string | null;
 }
 
-export function remainingPercent(w: RateWindow): number {
-  return Math.max(0, 100 - w.usedPercent);
-}
-
 export interface NamedRateWindow {
   id: string;
   title: string;
@@ -76,8 +72,4 @@ export function emptySnapshot(provider: UsageProvider, now: Date): UsageSnapshot
     dataConfidence: "unknown",
     updatedAt: now.toISOString(),
   };
-}
-
-export function hasRateWindows(s: UsageSnapshot): boolean {
-  return !!(s.primary || s.secondary || s.tertiary || (s.extraRateWindows && s.extraRateWindows.length));
 }

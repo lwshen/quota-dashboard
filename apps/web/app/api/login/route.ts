@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { ENV } from "@/lib/env";
-import { SESSION_COOKIE, createSessionToken } from "@/lib/auth";
+import { ENV } from "@/runtime/env";
+import { SESSION_COOKIE, createSessionToken } from "@/runtime/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

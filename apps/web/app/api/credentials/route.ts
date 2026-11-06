@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import type { ProviderCredentials, SourceMode } from "@quota/core";
 import { getDescriptor, isProvider } from "@quota/core";
-import { deleteCredential, getAccount, getCredential, listCredentials, listSnapshots, saveCredential, updateCredentialSecret } from "@/lib/store";
-import { CredentialInputError, prepareCredentialInput } from "@/lib/credential-input";
-import { fetchAndStore } from "@/lib/fetcher";
-import { assertSafeBaseUrl } from "@/lib/ssrf";
+import { deleteCredential, getAccount, getCredential, listCredentials, listSnapshots, saveCredential, updateCredentialSecret } from "@/server/storage";
+import { CredentialInputError, prepareCredentialInput } from "@/server/credentials/input";
+import { fetchAndStore } from "@/server/usage/fetcher";
+import { assertSafeBaseUrl } from "@/server/security/ssrf";
 import { normalizeGrokCredentials } from "@quota/core/grok-auth";
-import { resetHealthAlertState } from "@/lib/notify/alerts";
+import { resetHealthAlertState } from "@/server/notify/alerts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

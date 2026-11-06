@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { AccountMeta, ProviderMeta } from "@/lib/provider-management";
+import type { AccountMeta, ProviderMeta } from "@/shared/provider-management";
 
 export function AccountProfileForm({ account, providers, groups, initialGroup = "", onBusyChange, onSaved }: {
   account?: AccountMeta; providers: ProviderMeta[]; groups: string[]; initialGroup?: string;

@@ -1,5 +1,5 @@
 import type { RateWindow } from "@quota/core";
-import { barColor, extractFraction, formatCountdown } from "@/lib/format";
+import { barColor, extractFraction, formatCountdown } from "@/shared/format";
 
 export function RateWindowBar({
   title,

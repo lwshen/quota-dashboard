@@ -1,31 +1,14 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
-const { createRequire } = require("node:module");
 const { join } = require("node:path");
-const webRequire = createRequire(join(__dirname, "../package.json"));
-const ts = webRequire("typescript");
+const { createWebLoader, webRequire } = require("./helpers/load-web.cjs");
 const React = webRequire("react");
 const { renderToStaticMarkup } = webRequire("react-dom/server");
 const core = require(join(process.env.QUOTA_TEST_BUILD_DIR, "index.js"));
 
-// Load the real presentation modules with their browser aliases, without starting a server or poller.
-const modules = new Map();
-function load(relative) {
-  if (modules.has(relative)) return modules.get(relative);
-  const filename = join(__dirname, "..", relative);
-  const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-    fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 },
-  });
-  const module = { exports: {} };
-  const require = (name) => name === "@/lib/format" ? load("lib/format.ts")
-    : name === "./RateWindowBar" ? load("components/RateWindowBar.tsx") : webRequire(name);
-  new Function("require", "module", "exports", outputText)(require, module, module.exports);
-  modules.set(relative, module.exports);
-  return module.exports;
-}
-const { ProviderCard } = load("components/ProviderCard.tsx");
-const { formatCost, laneMeta } = load("lib/format.ts");
+const { load } = createWebLoader();
+const { ProviderCard } = load("components/dashboard/ProviderCard.tsx");
+const { formatCost, laneMeta } = load("shared/format.ts");
 const now = new Date("2026-10-25T12:00:00Z");
 const render = (snapshot) => renderToStaticMarkup(React.createElement(ProviderCard, {
   view: { provider: snapshot.provider, label: snapshot.provider, snapshot, error: null, fetchedAt: now.toISOString() },

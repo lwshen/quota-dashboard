@@ -1,6 +1,6 @@
 import type { UsageSnapshot } from "@quota/core";
-import { RateWindowBar } from "./RateWindowBar";
-import { computeBadge, formatCost, laneMeta, parseValueBlock, splitLabel } from "@/lib/format";
+import { RateWindowBar } from "@/components/dashboard/RateWindowBar";
+import { computeBadge, formatCost, laneMeta, parseValueBlock, splitLabel } from "@/shared/format";
 
 export interface ProviderView {
   accountId?: string;

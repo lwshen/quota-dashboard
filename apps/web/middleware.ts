@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ENV } from "./lib/env";
-import { SESSION_COOKIE, verifySessionToken } from "./lib/auth";
+import { ENV } from "@/runtime/env";
+import { SESSION_COOKIE, verifySessionToken } from "@/runtime/auth";
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],

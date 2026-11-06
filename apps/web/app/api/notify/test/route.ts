@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { notificationsEnabled, sendTestNotification } from "@/lib/notify";
+import { notificationsEnabled, sendTestNotification } from "@/server/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

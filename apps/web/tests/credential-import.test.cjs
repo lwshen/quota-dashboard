@@ -1,17 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
-const { createRequire } = require("node:module");
-const { join } = require("node:path");
-const webRequire = createRequire(join(__dirname, "../package.json"));
-const ts = webRequire("typescript");
-const filename = join(__dirname, "../lib/credential-import.ts");
-const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-});
-const loaded = { exports: {} };
-new Function("module", "exports", outputText)(loaded, loaded.exports);
-const { parseCredentialJson, MAX_CREDENTIAL_IMPORT_BYTES } = loaded.exports;
+const { createWebLoader } = require("./helpers/load-web.cjs");
+const { parseCredentialJson, MAX_CREDENTIAL_IMPORT_BYTES } = createWebLoader().load("shared/credential-import.ts");
 
 test("both Codex slots import auth.json, token objects, and form field objects", () => {
   const tokens = { access_token: " access ", refresh_token: " refresh ", account_id: " account ", id_token: "ignored" };

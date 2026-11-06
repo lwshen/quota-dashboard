@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useModalDialog } from "@/lib/hooks";
-import { splitLabel } from "@/lib/format";
-import { credentialStatus, type AccountMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
-import { AddCredentialForm } from "./AddCredentialForm";
-import { AccountProfileForm } from "./AccountProfileForm";
+import { useModalDialog } from "@/client/hooks";
+import { splitLabel } from "@/shared/format";
+import { credentialStatus, type AccountMeta, type CredentialMeta, type ProviderMeta } from "@/shared/provider-management";
+import { AddCredentialForm } from "@/components/accounts/AddCredentialForm";
+import { AccountProfileForm } from "@/components/accounts/AccountProfileForm";
 
 export function ProviderSettings({ initialProvider, onClose, onChanged }: {
   initialProvider?: string; onClose: () => void; onChanged: () => Promise<void>;

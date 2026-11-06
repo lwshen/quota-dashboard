@@ -1,10 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { readFileSync, mkdtempSync, rmSync } = require("node:fs");
-const { createRequire } = require("node:module");
-const { join, dirname } = require("node:path");
+const { join } = require("node:path");
 const { tmpdir } = require("node:os");
-const webRequire = createRequire(join(__dirname, "../package.json"));
+const { createWebLoader, webRequire } = require("./helpers/load-web.cjs");
 const ts = webRequire("typescript");
 const core = require(join(process.env.QUOTA_TEST_BUILD_DIR, "index.js"));
 
@@ -26,42 +25,27 @@ function fixture() {
     notifyAlertsEnabled: true, feishuWebhookUrl: "https://synthetic.invalid/webhook", notifyUsageThresholds: [80, 95],
     notifyBalanceThresholds: {}, notifyFailureThreshold: 3, notifyCooldownSeconds: 21600,
     notifyStaleSeconds: 1800, notifyRecovery: true, notifyMinUsedPercent: 80 };
-  const modules = new Map(), delivered = [];
+  const delivered = [];
   let deliver = async (message) => { delivered.push(message); };
   let upstream = async () => ({ status: 200, body: '{"rate_limit":{"primary_window":{"used_percent":20,"limit_window_seconds":18000}}}', headers: {} });
   class FakeChannel { name = "feishu"; send(message) { return deliver(message); } }
-  function load(relative) {
-    if (modules.has(relative)) return modules.get(relative);
-    const filename = join(__dirname, "..", relative);
-    const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-      fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-    });
-    const module = { exports: {} };
-    const require = (name) => {
-      if (name === "@quota/core") return { ...core, nodeHttpClient: { get: (...args) => upstream(...args) } };
-      if (name === "@/lib/env" || name === "./env" || name === "../env") return { ENV: env };
-      if (name === "./feishu") return { FeishuChannel: FakeChannel };
-      if (name === "./notify") return load("lib/notify/index.ts");
-      if (name.startsWith("@/")) return load(`${name.slice(2)}.ts`);
-      if (name.startsWith(".")) return load(join(dirname(relative), `${name}.ts`));
-      return webRequire(name);
-    };
-    new Function("require", "module", "exports", outputText)(require, module, module.exports);
-    modules.set(relative, module.exports);
-    return module.exports;
-  }
+  const { load, modules } = createWebLoader((name) => {
+    if (name === "@quota/core") return { ...core, nodeHttpClient: { get: (...args) => upstream(...args) } };
+    if (name === "@/runtime/env") return { ENV: env };
+    if (name === "@/server/notify/feishu") return { FeishuChannel: FakeChannel };
+  });
   const priorFetcher = globalThis.quotaUsageFetcher;
   delete globalThis.quotaUsageFetcher;
-  const store = load("lib/store.ts");
+  const store = load("server/storage/index.ts");
   const channels = [new FakeChannel()];
   const send = async (channel, message, current) => { if (!current()) return false; await channel.send(message); return true; };
   return { load, modules, env, store, channels, delivered, send,
     set deliver(value) { deliver = value; }, set upstream(value) { upstream = value; },
     async process(observation, time = start, opts = {}) {
-      await load("lib/notify/alerts.ts").processProviderAlerts("codex", observation, new Date(time), { ...defaults, ...opts }, channels, send);
+      await load("server/notify/alerts.ts").processProviderAlerts("codex", observation, new Date(time), { ...defaults, ...opts }, channels, send);
     },
     close() {
-      load("lib/db.ts").db().close();
+      load("server/storage/db.ts").db().close();
       if (priorFetcher) globalThis.quotaUsageFetcher = priorFetcher;
       else delete globalThis.quotaUsageFetcher;
       rmSync(directory, { recursive: true, force: true });
@@ -78,8 +62,8 @@ test("quota alerts group windows, escalate at 95%, and persist cooldowns across 
     assert.match(f.delivered[0].lines.join("\n"), /82%/);
     await f.process({ snapshot: sample }, start + 300_000);
     assert.equal(f.delivered.length, 1);
-    f.load("lib/db.ts").db().close();
-    for (const module of ["lib/db.ts", "lib/store.ts", "lib/notify/alerts.ts"]) f.modules.delete(module);
+    f.load("server/storage/db.ts").db().close();
+    f.modules.clear();
     await f.process({ snapshot: sample }, start + 600_000);
     assert.equal(f.delivered.length, 1);
     await f.process({ snapshot: snapshot(95) }, start + 900_000);
@@ -120,7 +104,7 @@ test("finite period quotas and opt-in balances alert in their original unit, inc
     assert.doesNotMatch(f.delivered[0].lines.join("\n"), /余额/);
     await f.process({ snapshot: sample }, start + 300_000, { balanceThreshold: 100 });
     assert.match(f.delivered[1].lines.join("\n"), /余额 0 Credits/);
-    const { processProviderAlerts } = f.load("lib/notify/alerts.ts");
+    const { processProviderAlerts } = f.load("server/notify/alerts.ts");
     for (const [provider, text, expected] of [["moonshot", "Balance: ¥-2.50", /余额 -2.5 ¥/], ["rightapi", "Balance: $0.00 · 待入账 $1.00", /余额 0 \$/]]) {
       await processProviderAlerts(provider, { snapshot: snapshot(0, { provider, primary: null, identity: { loginMethod: text } }) },
         new Date(start), { ...defaults, balanceThreshold: 5 }, f.channels, f.send);
@@ -174,12 +158,12 @@ test("same-account manual credential updates re-arm health warnings, retain quot
   const f = fixture();
   try {
     await f.process({ issue: { kind: "credentials" } });
-    f.load("lib/notify/alerts.ts").resetHealthAlertState("codex");
+    f.load("server/notify/alerts.ts").resetHealthAlertState("codex");
     assert.equal(f.store.getAlertState("codex", "health").failures, 0);
     await f.process({ snapshot: snapshot(85) }, start + 300_000);
     assert.equal(f.delivered.length, 2);
     assert.match(f.delivered[1].lines.join("\n"), /恢复正常/);
-    f.load("lib/notify/alerts.ts").resetHealthAlertState("codex");
+    f.load("server/notify/alerts.ts").resetHealthAlertState("codex");
     await f.process({ issue: { kind: "credentials" } }, start + 600_000);
     assert.equal(f.delivered.length, 3);
     await f.process({ snapshot: snapshot(85) }, start + 900_000);
@@ -256,7 +240,7 @@ test("production fetcher integrates alerts without forwarding raw upstream error
   try {
     f.store.saveCredential("codex", "auto", { bearerToken: "secret-access-token" }, new Date());
     f.upstream = async () => ({ status: 401, body: 'secret-upstream-content', headers: {} });
-    const { fetchAndStore } = f.load("lib/fetcher.ts");
+    const { fetchAndStore } = f.load("server/usage/fetcher.ts");
     await fetchAndStore("codex");
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(f.delivered.length, 1);
@@ -284,7 +268,7 @@ test("production fetcher integrates alerts without forwarding raw upstream error
 test("alert messages strip raw identity, escape upstream labels, and only include safe dashboard links", () => {
   const f = fixture();
   try {
-    const { buildAlertMessage } = f.load("lib/notify/message.ts");
+    const { buildAlertMessage } = f.load("server/notify/message.ts");
     const notices = [{ kind: "quota", title: '<at id="all">**bad**</at>\nlabel', value: 85, threshold: 80 }];
     const message = buildAlertMessage("codex", notices, new Date(start), "https://dashboard.example/path?token=secret#secret");
     assert.doesNotMatch(JSON.stringify(message), /<at|token=|#secret/);
@@ -298,7 +282,7 @@ test("alert messages strip raw identity, escape upstream labels, and only includ
 test("an interrupted send lease expires; channel delivery failures never duplicate a successful channel", async () => {
   const f = fixture();
   try {
-    const { processProviderAlerts } = f.load("lib/notify/alerts.ts");
+    const { processProviderAlerts } = f.load("server/notify/alerts.ts");
     const key = JSON.stringify(["quota", "primary", null, 300]);
     f.store.saveAlertState("codex", key, { level: 80, channels: { feishu: { lease: { token: "abandoned", until: start + 60_000 } } } });
     await f.process({ snapshot: snapshot(85) });
@@ -323,7 +307,7 @@ test("an interrupted send lease expires; channel delivery failures never duplica
 test("stale watchdog uses successful history, skips disabled channels, and does not notify without a webhook", async () => {
   const f = fixture();
   try {
-    const notify = f.load("lib/notify/index.ts");
+    const notify = f.load("server/notify/index.ts");
     f.store.saveCredential("codex", "auto", { bearerToken: "synthetic" }, new Date(start));
     f.store.saveSnapshot("codex", snapshot(20), null, new Date(start));
     notify.checkAndNotifyStaleUsage(new Date(start + 1_799_000));
@@ -338,8 +322,8 @@ test("stale watchdog uses successful history, skips disabled channels, and does 
     assert.equal(f.delivered.length, 1);
     f.store.setProviderEnabled("codex", true);
     f.env.feishuWebhookUrl = "";
-    f.modules.delete("lib/notify/index.ts");
-    f.load("lib/notify/index.ts").checkAndNotifyStaleUsage(new Date(start + 86_400_000));
+    f.modules.delete("server/notify/index.ts");
+    f.load("server/notify/index.ts").checkAndNotifyStaleUsage(new Date(start + 86_400_000));
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(f.delivered.length, 1);
     assert.equal(f.store.getAlertState("codex", "health"), null);
@@ -347,7 +331,7 @@ test("stale watchdog uses successful history, skips disabled channels, and does 
 });
 
 test("notification environment settings validate malformed thresholds and clamp numeric limits", () => {
-  const filename = join(__dirname, "../lib/env.ts");
+  const filename = join(__dirname, "../runtime/env.ts");
   const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } });
   const parse = (env) => {
     const module = { exports: {} };
@@ -378,8 +362,8 @@ test("Feishu renders warning cards in orange and recovery cards in green without
       requests.push(JSON.parse(options.body));
       return new Response('{"code":0}', { status: 200 });
     };
-    const { FeishuChannel } = f.load("lib/notify/feishu.ts");
-    const { buildAlertMessage } = f.load("lib/notify/message.ts");
+    const { FeishuChannel } = f.load("server/notify/feishu.ts");
+    const { buildAlertMessage } = f.load("server/notify/message.ts");
     const channel = new FeishuChannel("https://synthetic.invalid/webhook");
     await channel.send(buildAlertMessage("codex", [{ kind: "credentials", refreshRejected: true }], new Date(start)));
     await channel.send(buildAlertMessage("codex", [{ kind: "recovery" }], new Date(start)));

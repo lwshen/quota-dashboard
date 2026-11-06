@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { useModalDialog } from "@/lib/hooks";
-import type { HistoryPoint, HistoryRange, UsageHistory } from "@/lib/usage-history";
+import { useModalDialog } from "@/client/hooks";
+import type { HistoryPoint, HistoryRange, UsageHistory } from "@/shared/usage-history";
 
 const RANGES: { value: HistoryRange; label: string }[] = [
   { value: "24h", label: "近 24 小时" }, { value: "7d", label: "近 7 天" }, { value: "30d", label: "近 30 天" },

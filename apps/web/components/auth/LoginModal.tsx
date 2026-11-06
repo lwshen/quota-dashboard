@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useOnEscape } from "@/lib/hooks";
-import { BrandMark } from "./BrandMark";
+import { useOnEscape } from "@/client/hooks";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 export function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [password, setPassword] = useState("");

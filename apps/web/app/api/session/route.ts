@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { ENV } from "@/lib/env";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { ENV } from "@/runtime/env";
+import { SESSION_COOKIE, verifySessionToken } from "@/runtime/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

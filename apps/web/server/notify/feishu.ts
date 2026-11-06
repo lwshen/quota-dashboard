@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
-import type { NotifyChannel, NotifyMessage } from "./types";
-import { NotifyError } from "./types";
+import type { NotifyChannel, NotifyMessage } from "@/server/notify/types";
+import { NotifyError } from "@/server/notify/types";
 
 /**
  * Feishu (Lark) group custom-bot webhook.
