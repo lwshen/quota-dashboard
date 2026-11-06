@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isProvider, listDescriptors } from "@quota/core";
-import { listProviderSettings, setProviderEnabled } from "@/lib/store";
+import { listProviderSettings, setProviderEnabled } from "@/server/storage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

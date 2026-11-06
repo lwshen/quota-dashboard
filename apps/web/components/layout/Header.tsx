@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { formatClock } from "@/lib/format";
-import { useOnEscape } from "@/lib/hooks";
-import { BrandMark } from "./BrandMark";
+import { formatClock } from "@/shared/format";
+import { useOnEscape } from "@/client/hooks";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 export function Header({
   now,

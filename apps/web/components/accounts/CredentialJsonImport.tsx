@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { MAX_CREDENTIAL_IMPORT_BYTES, parseCredentialJson, type JsonCredentialProvider } from "@/lib/credential-import";
+import { MAX_CREDENTIAL_IMPORT_BYTES, parseCredentialJson, type JsonCredentialProvider } from "@/shared/credential-import";
 
 export function CredentialJsonImport({ provider, busy, onBusyChange, onImported }: {
   provider: JsonCredentialProvider;

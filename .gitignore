@@ -12,3 +12,4 @@ data/
 *.sqlite-*
 .DS_Store
 *.local
+.pnpm-store/

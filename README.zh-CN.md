@@ -25,19 +25,22 @@ api.anthropic.com · chatgpt.com/backend-api · api.kimi.com · ...
 
 ```
 quota-dashboard/
-├─ packages/core/          # 与服务商无关的核心（可独立测试）
-│  └─ src/
-│     ├─ model.ts          # RateWindow / UsageSnapshot 等统一模型
-│     ├─ adapter.ts        # ProviderFetchStrategy / runPipeline 管线
-│     ├─ decode.ts         # 容错解码 helper
-│     ├─ http.ts           # HttpClient 抽象 + Node fetch 实现
-│     ├─ registry.ts       # provider 注册表
-│     └─ providers/        # kimi / moonshot / claude / codex / grok / rightapi
-└─ apps/web/               # Next.js 看板 + 后端代理
-   ├─ app/                 # 页面 + API routes
-   ├─ components/          # ProviderCard / RateWindowBar / 表单
-   └─ lib/                 # db / crypto / store / fetcher / poller
+├─ packages/core/          # 统一模型、服务商适配、OAuth 与 HTTP（不依赖框架）
+│  ├─ src/providers/       # kimi / moonshot / claude / codex / grok / rightapi
+│  └─ tests/               # 离线协议与采集测试
+├─ apps/web/
+│  ├─ app/                 # 页面和 API 路由
+│  ├─ components/          # accounts / auth / dashboard / layout 功能组件
+│  ├─ client/              # 浏览器交互 hooks
+│  ├─ shared/              # 纯计算、格式化、接口类型、JSON 导入
+│  ├─ runtime/             # Edge / Node 共用配置与会话鉴权
+│  ├─ server/              # credentials / security / storage / usage / notify
+│  └─ tests/               # API、SQLite、通知、渲染回归测试
+├─ scripts/                # 环境初始化、统一测试、模块依赖边界检查
+└─ docs/                   # 架构维护指南和功能截图
 ```
+
+职责划分、依赖规则和后续维护入口见[项目结构与维护指南](./docs/architecture.zh-CN.md)。
 
 ## 已实现的 provider
 
@@ -150,7 +153,7 @@ NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口�
 
 配置了通知渠道后，服务启动时还会推送一条上线消息（可当作重启/存活信号）。
 
-消息里的重置时间使用服务器时区，部署时请设置 `TZ`（如 `TZ=Asia/Shanghai`）。要接入其他渠道（Telegram、Slack 等），在 `apps/web/lib/notify/` 实现 `NotifyChannel` 接口并在 `notify/index.ts` 注册即可。
+消息里的重置时间使用服务器时区，部署时请设置 `TZ`（如 `TZ=Asia/Shanghai`）。要接入其他渠道（Telegram、Slack 等），在 `apps/web/server/notify/` 实现 `NotifyChannel` 接口并在 `notify/index.ts` 注册即可。
 
 ## 额度不足与渠道异常提醒
 

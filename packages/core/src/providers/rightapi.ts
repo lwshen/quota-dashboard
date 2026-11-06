@@ -4,7 +4,7 @@
 // emits no RateWindows (modelling RPM as a 1-minute window would make every burst
 // look like a quota reset to core/src/reset.ts).
 // The response echoes the credential itself, so the raw body is redacted before it
-// reaches `extra` (and note DEBUG=true logs raw bodies in apps/web/lib/fetcher.ts).
+// reaches `extra` (and note DEBUG=true logs raw bodies in apps/web/server/usage/fetcher.ts).
 
 import type { ProviderDescriptor, ProviderFetchStrategy } from "../adapter";
 import { RateLimitedError, UnauthorizedError, UpstreamError } from "../adapter";

@@ -12,6 +12,8 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": false,
-    "verbatimModuleSyntax": false
+    "verbatimModuleSyntax": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   }
 }

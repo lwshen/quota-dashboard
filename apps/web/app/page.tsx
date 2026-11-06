@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Header } from "@/components/Header";
-import { LoginModal } from "@/components/LoginModal";
-import { ProviderCard, type ProviderView } from "@/components/ProviderCard";
-import { ProviderSettings } from "@/components/ProviderSettings";
+import { Header } from "@/components/layout/Header";
+import { LoginModal } from "@/components/auth/LoginModal";
+import { ProviderCard, type ProviderView } from "@/components/dashboard/ProviderCard";
+import { ProviderSettings } from "@/components/accounts/ProviderSettings";
 
-const UsageHistoryDialog = dynamic(() => import("@/components/UsageHistoryDialog").then((module) => module.UsageHistoryDialog));
+const UsageHistoryDialog = dynamic(() => import("@/components/dashboard/UsageHistoryDialog").then((module) => module.UsageHistoryDialog));
 
 export default function Home() {
   const [views, setViews] = useState<ProviderView[]>([]);
