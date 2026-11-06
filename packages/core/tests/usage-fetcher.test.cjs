@@ -170,3 +170,32 @@ test("deletion during usage does not resurrect a snapshot or notifications", asy
   assert.equal(f.publications.length, 0);
   assert.equal((await f.fetch("grok")).error, "未配置凭据");
 });
+
+test("publications carry safe typed issues only after refresh and retry have failed", async () => {
+  for (const [error, kind] of [
+    [new core.UnauthorizedError("secret-upstream-body"), "credentials"],
+    [new core.RateLimitedError(300), "rate_limit"],
+    [new core.UpstreamError(403, "secret-denied"), "upstream"],
+    [new Error("secret-network-detail"), "upstream"],
+  ]) {
+    const f = fixture({ usage: async () => { throw error; } });
+    delete f.record.credentials.refreshToken;
+    await f.fetch("grok");
+    assert.deepEqual(f.publications[0][4], { kind });
+    assert.doesNotMatch(JSON.stringify(f.publications[0][4]), /secret/);
+  }
+  const blocked = fixture({ refresh: async () => { throw new core.RefreshRejectedError(); } });
+  await blocked.fetch("grok");
+  assert.deepEqual(blocked.publications[0][4], { kind: "refresh_rejected" });
+  const refreshed = fixture({ usage: async (creds) => {
+    if (creds.bearerToken === "old-access") throw new core.UnauthorizedError();
+    return { provider: "grok" };
+  } });
+  refreshed.record.credentials.expiresAt = "2026-10-20T00:00:00Z";
+  await refreshed.fetch("grok");
+  assert.equal(refreshed.publications.length, 1);
+  assert.equal(refreshed.publications[0][4], undefined, "successful reactive refresh never emits a credential alert");
+  const transient = fixture({ refresh: async () => { throw new core.UpstreamError(503); } });
+  await transient.fetch("grok");
+  assert.equal(transient.publications[0][4], undefined, "temporary proactive refresh failure preserves still-valid usage");
+});

@@ -3,6 +3,7 @@
 
 export interface NotifyMessage {
   title: string;
+  severity?: "warning" | "success";
   /** Markdown-flavored body lines; channels render them as faithfully as their format allows. */
   lines: string[];
 }

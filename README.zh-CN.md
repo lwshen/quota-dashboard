@@ -145,6 +145,35 @@ NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口�
 
 消息里的重置时间使用服务器时区，部署时请设置 `TZ`（如 `TZ=Asia/Shanghai`）。要接入其他渠道（Telegram、Slack 等），在 `apps/web/lib/notify/` 实现 `NotifyChannel` 接口并在 `notify/index.ts` 注册即可。
 
+## 额度不足与渠道异常提醒
+
+配置上述飞书机器人后，后台采集和手动刷新均会检查额度与渠道状态，默认启用以下提醒：
+
+- **额度不足**：已知用量达到 **80%** 或 **95%** 时分级提醒，适用于配额窗口和有明确上限的周期用量。未知用量、无上限额度和产品组成占比不会触发。模型、窗口时长及余额单位分别处理。
+- **连续失败**：连续 **3 次**获取失败后提醒；一次成功获取会清零失败计数。上游限流会作为获取异常处理。
+- **凭据异常**：用量接口拒绝凭据，或 OAuth 续期明确永久失效时立即提醒，并提示检查 Token／权限或重新登录导入。正常自动续期、短暂续期故障且仍可获取用量时不会误报。
+- **数据过期**：后台轮询期间，距最后成功获取超过 **30 分钟**时提醒，实际阈值不小于三个轮询周期。已有获取异常／凭据提醒时不重复添加过期提醒。此检查需要看板进程仍在运行。
+- **恢复通知**：成功获取用量后，向此前成功收到渠道异常提醒的通知渠道发送一次恢复消息。
+
+同一渠道的一次采集触发多个预警时合并发送。相同指标、通知渠道的未解决预警默认每 **6 小时**最多重复一次，达到更高百分比或升级为凭据问题时立即提醒；低于阈值后短时间再次越线仍受冷却限制。去重、失败计数与投递状态保存在 SQLite 的 `notification_alert_state` 表，重启后继续有效。发送失败不会记为已送达，下次采集会重试；每个通知渠道独立记录结果。
+
+余额阈值默认关闭，需按服务商的原始单位单独配置。例如 Codex 的单位是 Credits，Moonshot 随地区为美元或人民币，不做币种换算：
+
+```dotenv
+NOTIFY_ALERTS_ENABLED=true
+NOTIFY_USAGE_THRESHOLDS=80,95
+NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100,"codex2":100}
+NOTIFY_FAILURE_THRESHOLD=3
+NOTIFY_COOLDOWN_SECONDS=21600
+NOTIFY_STALE_SECONDS=1800
+NOTIFY_RECOVERY=true
+DASHBOARD_URL=https://quota.example.com
+```
+
+`NOTIFY_USAGE_THRESHOLDS` 留空关闭百分比预警，`NOTIFY_BALANCE_THRESHOLDS={}` 关闭余额预警；余额小于或等于阈值时触发，支持零余额和负余额。`NOTIFY_ALERTS_ENABLED=false` 关闭本节新增提醒，保留原有的重置／启动／测试通知；`NOTIFY_RECOVERY=false` 单独关闭恢复通知。修改环境变量后重启生效。
+
+未配置凭据或停用的渠道不提醒。停用、删除或替换整套凭据会清除该渠道提醒状态；同账户手动更新凭据会重新开始异常计数并保留用量预警冷却，自动 OAuth 轮换不清除状态。提醒只包含渠道、用量和固定的处理建议，不发送账户身份、Token 或上游原始错误正文；可选的 `DASHBOARD_URL` 提供返回看板的链接，不会作为服务端请求目标。
+
 ## 构建 / 部署
 
 ```bash

@@ -35,6 +35,12 @@ export function db(): Database.Database {
       fetched_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_history_provider ON snapshot_history(provider, fetched_at);
+    CREATE TABLE IF NOT EXISTS notification_alert_state (
+      provider  TEXT NOT NULL,
+      alert_key TEXT NOT NULL,
+      state     TEXT NOT NULL,
+      PRIMARY KEY (provider, alert_key)
+    );
   `);
   _db = d;
   return d;

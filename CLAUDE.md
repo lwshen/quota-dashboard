@@ -50,7 +50,7 @@ UI and backend need no changes — credential form fields and card rendering are
 - `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`.
 - `lib/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
 - `GET /api/usage` → returns stored snapshots with UI-safe fields only (raw upstream `extra` is stripped).
-- `lib/notify/` → quota-reset notifications. `detectQuotaResets` (`core/src/reset.ts`, pure) compares the new snapshot against the last good one from `snapshot_history`; `fetchAndStore` calls `detectAndNotifyResets` **before** `saveSnapshot` (which overwrites the comparison base). Channels implement `NotifyChannel` (`notify/types.ts`) and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
+- `lib/notify/` → quota-reset, low-quota, credential/fetch-failure, stale-data, and recovery notifications. `fetchAndStore` invokes detection **before** `saveSnapshot`; fetch issues are typed in core, never classified by matching raw error strings. `notify/alerts.ts` groups warnings and persists per-channel cooldowns/delivery reservations in `notification_alert_state`. The poller also checks stale data. Channels implement `NotifyChannel` and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
 
 ## Conventions & gotchas
 
@@ -63,7 +63,7 @@ UI and backend need no changes — credential form fields and card rendering are
 
 ## Environment variables
 
-Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60 — the usage endpoints rate-limit faster polling), `ENABLE_POLLER`, `FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET` / `NOTIFY_MIN_USED_PERCENT` (quota-reset notifications; unset webhook URL disables them).
+Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60), `ENABLE_POLLER`, `FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET` / `NOTIFY_MIN_USED_PERCENT`. Alert settings: `NOTIFY_ALERTS_ENABLED`, `NOTIFY_USAGE_THRESHOLDS` (80,95), `NOTIFY_BALANCE_THRESHOLDS` (opt-in per-provider JSON map), `NOTIFY_FAILURE_THRESHOLD` (3), `NOTIFY_COOLDOWN_SECONDS` (21600), `NOTIFY_STALE_SECONDS` (1800, minimum three poll intervals), `NOTIFY_RECOVERY`, and optional `DASHBOARD_URL`. An unset webhook disables all notifications.
 
 ## Deployment
 

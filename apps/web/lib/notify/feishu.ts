@@ -19,7 +19,7 @@ export class FeishuChannel implements NotifyChannel {
       msg_type: "interactive",
       card: {
         config: { wide_screen_mode: true },
-        header: { template: "green", title: { tag: "plain_text", content: message.title } },
+        header: { template: message.severity === "warning" ? "orange" : "green", title: { tag: "plain_text", content: message.title } },
         elements: [{ tag: "div", text: { tag: "lark_md", content: message.lines.join("\n") } }],
       },
     };

@@ -1,7 +1,7 @@
 import type { HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
 import { createUsageFetcher, nodeHttpClient } from "@quota/core";
 import { ENV } from "./env";
-import { detectAndNotifyResets } from "./notify";
+import { detectAndNotifyAlerts, detectAndNotifyResets } from "./notify";
 import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "./store";
 
 export interface FetchResult {
@@ -29,8 +29,9 @@ export const fetchAndStore = processState.quotaUsageFetcher ??= createUsageFetch
   load: getCredential,
   update: updateCredentialSecret,
   http: debugHttpClient,
-  publish(provider, snapshot, error, now) {
+  publish(provider, snapshot, error, now, issue) {
     if (snapshot) detectAndNotifyResets(provider, snapshot, now);
+    detectAndNotifyAlerts(provider, snapshot, issue, now);
     saveSnapshot(provider, snapshot, error, now);
   },
 });

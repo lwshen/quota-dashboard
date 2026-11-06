@@ -1,7 +1,8 @@
-import type { QuotaResetEvent } from "@quota/core";
+import type { QuotaResetEvent, UsageProvider } from "@quota/core";
 import { getDescriptor } from "@quota/core";
 import { laneMeta, splitLabel } from "../format";
 import type { NotifyMessage } from "./types";
+import type { AlertNotice } from "./alerts";
 
 function laneLabel(e: QuotaResetEvent): string {
   if (e.laneTitle) return e.laneTitle;
@@ -59,10 +60,50 @@ export function buildTestMessage(now: Date): NotifyMessage {
   };
 }
 
+function safeText(value: string): string {
+  return value.replace(/[\r\n]/g, " ").replace(/[<>]/g, "").replace(/[\\*_`\[\]]/g, "\\$&").slice(0, 160);
+}
+
+export function buildAlertMessage(provider: UsageProvider, notices: AlertNotice[], now: Date, dashboardUrl?: string): NotifyMessage {
+  const name = splitLabel(getDescriptor(provider).label).name;
+  const number = (value: number) => value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+  const lines = notices.map((notice) => {
+    if (notice.kind === "quota") {
+      return `**${safeText(notice.title)}** 已用 ${number(notice.value)}%（预警阈值 ${number(notice.threshold)}%）`
+        + (notice.resetsAt && Number.isFinite(Date.parse(notice.resetsAt)) ? `\n重置时间：${fmtTime(notice.resetsAt)}` : "");
+    }
+    if (notice.kind === "balance") return `余额 ${number(notice.value)} ${safeText(notice.unit)}，已低于或达到阈值 ${number(notice.threshold)} ${safeText(notice.unit)}。请检查余额或充值。`;
+    if (notice.kind === "recovery") return "已重新成功获取用量，渠道恢复正常。";
+    if (notice.kind === "stale") return `用量数据长时间未更新。监控起点／最后成功时间：${fmtTime(notice.since)}。请检查服务运行状态和渠道配置。`;
+    const last = notice.lastSuccessAt ? `\n最后成功获取：${fmtTime(notice.lastSuccessAt)}` : "\n尚未成功获取用量。";
+    if (notice.kind === "credentials") {
+      return (notice.refreshRejected ? "凭据自动续期已被永久拒绝。请重新登录并导入完整凭据。"
+        : "用量接口拒绝了当前凭据。请检查 Token 是否有效及账户权限，并在渠道管理中更新凭据。") + last;
+    }
+    return `连续 ${notice.failures} 次获取用量失败${notice.rateLimited ? "（上游限流）" : ""}。将继续自动重试，请检查网络及上游服务。${last}`;
+  });
+  lines.unshift(`**${safeText(name)}**`);
+  if (dashboardUrl) {
+    try {
+      const url = new URL(dashboardUrl);
+      if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) {
+        url.search = "";
+        url.hash = "";
+        lines.push(`[打开看板 · 渠道管理](${url.href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`);
+      }
+    } catch { /* Ignore invalid optional links. */ }
+  }
+  lines.push(`检测时间：${fmtTime(now.toISOString())}`);
+  const title = notices.some((notice) => notice.kind === "credentials") ? "⚠ 凭据需要处理"
+    : notices.some((notice) => notice.kind === "failure" || notice.kind === "stale") ? "⚠ 渠道获取异常"
+    : notices.every((notice) => notice.kind === "recovery") ? "✅ 渠道已恢复" : "⚠ 额度不足预警";
+  return { title, lines, severity: notices.every((notice) => notice.kind === "recovery") ? "success" : "warning" };
+}
+
 export function buildStartupMessage(now: Date, opts: { pollIntervalSeconds: number; pollerEnabled: boolean }): NotifyMessage {
   const polling = opts.pollerEnabled ? `轮询间隔：${opts.pollIntervalSeconds} 秒` : "后台轮询已禁用（ENABLE_POLLER=false）";
   return {
     title: "🚀 服务已启动",
-    lines: ["Quota Dashboard 已启动，配额重置监控运行中。", polling, `启动时间：${fmtTime(now.toISOString())}`],
+    lines: ["Quota Dashboard 已启动。", polling, `启动时间：${fmtTime(now.toISOString())}`],
   };
 }
