@@ -31,9 +31,9 @@ function fixture() {
       if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
       if (name === "@/lib/auth" || name === "./lib/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (token) => token === "valid" };
       if (name === "@/lib/env" || name === "./env" || name === "./lib/env") return { ENV: env };
-      if (name === "./notify") return { detectAndNotifyResets() {} };
+      if (name === "./notify") return { detectAndNotifyResets() {}, detectAndNotifyAlerts() {} };
       if (name.startsWith("@/")) return load(`${name.slice(2)}.ts`);
-      if (name.startsWith("./")) return load(join(relative.slice(0, relative.lastIndexOf("/")), `${name.slice(2)}.ts`));
+      if (name.startsWith(".")) return load(join(relative.slice(0, relative.lastIndexOf("/")), `${name}.ts`));
       return webRequire(name);
     };
     new Function("require", "module", "exports", outputText)(require, module, module.exports);
@@ -143,6 +143,8 @@ test("credential editing preserves same-account values, requires explicit replac
       assert.equal(entry.fetchError, null);
     });
     await t.test("blank optional inputs retain existing values; rotated access clears stale expiry and block state", async () => {
+      store.saveAlertState("codex", "health", { level: 2, failures: 3, channels: {} });
+      store.saveAlertState("codex", "quota-existing", { level: 80, channels: {} });
       const res = await route.POST(request({ provider: "codex", action: "update", fields: { bearerToken: "new-access", refreshToken: "" }, confirmSameAccount: true }));
       assert.equal(res.status, 200);
       assert.equal((await res.json()).disabled, true);
@@ -156,6 +158,8 @@ test("credential editing preserves same-account values, requires explicit replac
       assert.equal(store.historyFor("codex").length, 1);
       assert.equal(store.listSnapshots().length, 1);
       assert.equal(f.networkCalls, 0);
+      assert.equal(store.getAlertState("codex", "health").failures, 0);
+      assert.equal(store.getAlertState("codex", "quota-existing").level, 80);
     });
     await t.test("clear optional values explicitly; reject token mixing and invalid fields without writing", async () => {
       const clear = await route.POST(request({ provider: "codex", action: "update", fields: {}, clearFields: ["refreshToken"] }));

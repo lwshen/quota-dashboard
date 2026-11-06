@@ -17,10 +17,14 @@ export interface UsageFetchResult {
   error: string | null;
 }
 
+export interface UsageFetchIssue {
+  kind: "credentials" | "refresh_rejected" | "rate_limit" | "upstream";
+}
+
 interface Dependencies {
   load(provider: UsageProvider): CredentialRecord | null;
   update(provider: UsageProvider, credentials: ProviderCredentials, now: Date, revision: string): string | null;
-  publish(provider: UsageProvider, snapshot: UsageSnapshot | null, error: string | null, now: Date): void;
+  publish(provider: UsageProvider, snapshot: UsageSnapshot | null, error: string | null, now: Date, issue?: UsageFetchIssue): void;
   http(provider: UsageProvider): HttpClient;
   descriptor?(provider: UsageProvider): ProviderDescriptor;
   now?(): Date;
@@ -108,7 +112,11 @@ export function createUsageFetcher(deps: Dependencies): (provider: UsageProvider
       return { snapshot, error: null };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (isCurrent()) deps.publish(provider, null, message, now());
+      if (isCurrent()) deps.publish(provider, null, message, now(), {
+        kind: error instanceof RefreshRejectedError ? "refresh_rejected"
+          : error instanceof UnauthorizedError ? "credentials"
+          : error instanceof RateLimitedError ? "rate_limit" : "upstream",
+      });
       return { snapshot: null, error: message };
     }
   }

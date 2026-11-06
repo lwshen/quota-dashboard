@@ -27,6 +27,7 @@ export function listProviderSettings(): Map<string, boolean> {
 export function setProviderEnabled(provider: UsageProvider, enabled: boolean): void {
   db().prepare(`INSERT INTO provider_settings (provider, enabled) VALUES (?, ?)
     ON CONFLICT(provider) DO UPDATE SET enabled=excluded.enabled`).run(provider, Number(enabled));
+  if (!enabled) clearAlertState(provider);
 }
 
 // A separate setting also covers providers that have no credentials yet.
@@ -57,6 +58,7 @@ export function saveCredential(provider: UsageProvider, mode: SourceMode, creds:
   // Never show or compare a previous account's usage after replacement.
   db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
   db().prepare(`DELETE FROM snapshots WHERE provider=?`).run(provider);
+  clearAlertState(provider);
 }
 
 export function updateCredentialSecret(provider: UsageProvider, creds: ProviderCredentials, now: Date, revision: string): string | null {
@@ -71,6 +73,23 @@ export function deleteCredential(provider: UsageProvider): void {
   db().prepare(`DELETE FROM credentials WHERE provider=?`).run(provider);
   db().prepare(`DELETE FROM snapshots WHERE provider=?`).run(provider);
   db().prepare(`DELETE FROM snapshot_history WHERE provider=?`).run(provider);
+  clearAlertState(provider);
+}
+
+export function getAlertState<T>(provider: UsageProvider, key: string): T | null {
+  const row = db().prepare(`SELECT state FROM notification_alert_state WHERE provider=? AND alert_key=?`)
+    .get(provider, key) as { state: string } | undefined;
+  return row ? JSON.parse(row.state) as T : null;
+}
+
+export function saveAlertState(provider: UsageProvider, key: string, state: unknown): void {
+  db().prepare(`INSERT INTO notification_alert_state (provider, alert_key, state) VALUES (?, ?, ?)
+    ON CONFLICT(provider, alert_key) DO UPDATE SET state=excluded.state`).run(provider, key, JSON.stringify(state));
+}
+
+export function clearAlertState(provider: UsageProvider, key?: string): void {
+  if (key) db().prepare(`DELETE FROM notification_alert_state WHERE provider=? AND alert_key=?`).run(provider, key);
+  else db().prepare(`DELETE FROM notification_alert_state WHERE provider=?`).run(provider);
 }
 
 export function listCredentials(): StoredCredential[] {

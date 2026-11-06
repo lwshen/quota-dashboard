@@ -1,5 +1,6 @@
 import { ENV } from "./env";
 import { fetchAllConfigured } from "./fetcher";
+import { checkAndNotifyStaleUsage } from "./notify";
 
 let started = false;
 let timer: ReturnType<typeof setInterval> | null = null;
@@ -13,6 +14,7 @@ export function startPoller(): void {
   fetchAllConfigured().catch((e) => console.error("[poller] initial fetch failed", e));
 
   timer = setInterval(() => {
+    checkAndNotifyStaleUsage(new Date());
     fetchAllConfigured().catch((e) => console.error("[poller] fetch failed", e));
   }, ms);
   if (typeof timer.unref === "function") timer.unref();

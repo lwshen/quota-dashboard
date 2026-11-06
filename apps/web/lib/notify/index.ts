@@ -1,11 +1,12 @@
-import type { QuotaResetEvent, UsageProvider, UsageSnapshot } from "@quota/core";
+import type { QuotaResetEvent, UsageFetchIssue, UsageProvider, UsageSnapshot } from "@quota/core";
 import { detectQuotaResets } from "@quota/core";
 import { ENV } from "../env";
-import { historyFor } from "../store";
+import { getAlertState, getCredential, historyFor, listCredentials } from "../store";
 import { FeishuChannel } from "./feishu";
 import { buildQuotaResetMessage, buildStartupMessage, buildTestMessage } from "./message";
 import type { NotifyChannel, NotifyDeliveryResult, NotifyMessage } from "./types";
 import { NotifyError } from "./types";
+import { processProviderAlerts, type AlertOptions, type AlertState } from "./alerts";
 
 let _channels: NotifyChannel[] | null = null;
 
@@ -29,15 +30,55 @@ export function notificationsEnabled(): boolean {
 // so a transient send failure would lose the notification forever — retry briefly.
 const RETRY_DELAYS_MS = [1_000, 5_000];
 
-async function sendWithRetry(ch: NotifyChannel, message: NotifyMessage): Promise<void> {
+async function sendWithRetry(ch: NotifyChannel, message: NotifyMessage, current = () => true): Promise<boolean> {
   for (let attempt = 0; ; attempt++) {
+    if (!current()) return false;
     try {
       await ch.send(message);
-      return;
+      return true;
     } catch (e) {
       if (!(e instanceof NotifyError && e.retryable) || attempt >= RETRY_DELAYS_MS.length) throw e;
       await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
     }
+  }
+}
+
+function alertOptions(provider: UsageProvider): AlertOptions {
+  return {
+    usageThresholds: ENV.notifyUsageThresholds,
+    balanceThreshold: ENV.notifyBalanceThresholds[provider],
+    failureThreshold: ENV.notifyFailureThreshold,
+    cooldownSeconds: ENV.notifyCooldownSeconds,
+    staleSeconds: Math.max(ENV.notifyStaleSeconds, 3 * Math.max(60, ENV.pollInterval)),
+    recovery: ENV.notifyRecovery,
+    dashboardUrl: ENV.dashboardUrl,
+  };
+}
+
+export function detectAndNotifyAlerts(provider: UsageProvider, snapshot: UsageSnapshot | null, issue: UsageFetchIssue | undefined, now: Date): void {
+  try {
+    if (!ENV.notifyAlertsEnabled || !notificationsEnabled() || !getCredential(provider)?.enabled) return;
+    const lastSuccessAt = snapshot ? undefined : historyFor(provider, 1)[0]?.fetchedAt;
+    void processProviderAlerts(provider, { snapshot, issue, lastSuccessAt }, now, alertOptions(provider), channels(), sendWithRetry)
+      .catch(() => console.error("[notify] alert processing failed"));
+  } catch {
+    console.error("[notify] alert processing failed");
+  }
+}
+
+export function checkAndNotifyStaleUsage(now: Date): void {
+  try {
+    if (!ENV.notifyAlertsEnabled || !notificationsEnabled()) return;
+    for (const credential of listCredentials().filter((item) => item.enabled)) {
+      const health = getAlertState<AlertState>(credential.provider, "health");
+      const lastSuccessAt = historyFor(credential.provider, 1)[0]?.fetchedAt;
+      const since = lastSuccessAt ?? health?.firstFailureAt ?? credential.updatedAt;
+      void processProviderAlerts(credential.provider, { staleSince: since, lastSuccessAt }, now,
+        alertOptions(credential.provider), channels(), sendWithRetry)
+        .catch(() => console.error("[notify] stale detection failed"));
+    }
+  } catch {
+    console.error("[notify] stale detection failed");
   }
 }
 

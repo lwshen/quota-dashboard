@@ -152,6 +152,35 @@ When channels are configured, a one-shot startup message is also sent as the ser
 
 Reset times in messages use the server timezone — set `TZ` (e.g. `TZ=Asia/Shanghai`) in your deployment. Other channels (Telegram, Slack, ...) can be added by implementing the `NotifyChannel` interface in `apps/web/lib/notify/` and registering it in `notify/index.ts`.
 
+## Low-quota and provider-health alerts
+
+With the Feishu bot configured, background polling and manual refreshes also check these conditions by default:
+
+- **Low quota:** warn at **80%** and **95%** used, for known rate windows and finite period quotas. Unknown usage, unlimited quotas, and product shares do not trigger alerts. Model identities, window durations, and balance units remain separate.
+- **Fetch failures:** warn after **3 consecutive failures**. A successful fetch resets the counter. Upstream rate limits count as fetch failures.
+- **Credential problems:** immediately warn when a usage endpoint rejects credentials or OAuth renewal is permanently rejected, with instructions to check the token/permissions or sign in and import credentials again. Successful automatic renewal and temporary renewal errors that still allow usage retrieval do not trigger credential warnings.
+- **Stale data:** while the background poller is running, warn after **30 minutes** without a successful fetch, with an effective minimum of three polling intervals. An active fetch/credential warning suppresses a duplicate stale warning. The dashboard process must still be running for this check.
+- **Recovery:** send one recovery message after the next successful fetch, only to notification channels that received a provider-health warning.
+
+Warnings raised by one provider observation are grouped into one message. An unresolved warning repeats at most every **6 hours** per metric and notification channel; crossing a higher percentage threshold or escalating to a credential problem alerts immediately. Briefly falling below a threshold and crossing again remains subject to the cooldown. SQLite's `notification_alert_state` table persists failure counts, cooldowns, and per-channel delivery state across restarts. Failed sends are retried on later observations rather than marked delivered.
+
+Balance warnings are opt-in, with separate thresholds in each provider's original unit. Codex uses Credits; Moonshot follows its configured region. No currency conversion is performed:
+
+```dotenv
+NOTIFY_ALERTS_ENABLED=true
+NOTIFY_USAGE_THRESHOLDS=80,95
+NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100,"codex2":100}
+NOTIFY_FAILURE_THRESHOLD=3
+NOTIFY_COOLDOWN_SECONDS=21600
+NOTIFY_STALE_SECONDS=1800
+NOTIFY_RECOVERY=true
+DASHBOARD_URL=https://quota.example.com
+```
+
+An empty `NOTIFY_USAGE_THRESHOLDS` disables percentage warnings; `NOTIFY_BALANCE_THRESHOLDS={}` disables balance warnings. Balances at or below their threshold trigger warnings, including zero and negative values. `NOTIFY_ALERTS_ENABLED=false` disables these new alerts while retaining reset/startup/test notifications. `NOTIFY_RECOVERY=false` disables recovery notices only. Restart after changing environment settings.
+
+Unconfigured and disabled providers do not alert. Disabling a provider, deleting credentials, or replacing the complete credential set clears its alert state. Same-account manual credential updates re-arm health warnings while retaining quota cooldowns; automatic OAuth rotations retain alert state. Notifications include provider names, usage, and fixed action guidance, without account identities, tokens, or raw upstream error bodies. The optional `DASHBOARD_URL` adds a link to the dashboard and is never used as a server-side request destination.
+
 ## Build / deploy
 
 ```bash

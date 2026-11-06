@@ -6,6 +6,7 @@ import { CredentialInputError, prepareCredentialInput } from "@/lib/credential-i
 import { fetchAndStore } from "@/lib/fetcher";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
 import { normalizeGrokCredentials } from "@quota/core/grok-auth";
+import { resetHealthAlertState } from "@/lib/notify/alerts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
     if (!existing || !updateCredentialSecret(provider, creds, now, existing.revision)) {
       return NextResponse.json({ error: "凭据已被其他请求更新，请重新打开配置后重试" }, { status: 409 });
     }
+    resetHealthAlertState(provider);
   } else {
     saveCredential(provider, mode, creds, now);
   }
