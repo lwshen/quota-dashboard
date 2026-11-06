@@ -91,19 +91,18 @@ body {
   margin-bottom: clamp(18px, 3vw, 26px);
 }
 
-.logodot {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: linear-gradient(135deg, #8b7cff, var(--openai));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font:
-    700 15px var(--font-jetbrains-mono),
-    monospace;
+.brand-mark {
+  display: block;
+  width: 44px;
+  height: 40px;
+  object-fit: contain;
   flex: none;
+}
+
+.login-brand-mark {
+  width: 52px;
+  height: 48px;
+  margin-bottom: 15px;
 }
 
 .h-title {

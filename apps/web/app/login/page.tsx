@@ -2,6 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { BrandMark } from "@/components/BrandMark";
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");
@@ -36,9 +37,7 @@ export default function LoginPage() {
   return (
     <div className="app" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
       <form onSubmit={submit} className="modal" style={{ maxWidth: 360 }}>
-        <div className="logodot" style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 15 }}>
-          ◇
-        </div>
+        <BrandMark className="login-brand-mark" />
         <div className="modal-title">管理员登录 · Admin</div>
         <div className="modal-sub">输入管理员密码以访问配额看板</div>
         <input

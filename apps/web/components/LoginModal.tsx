@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useOnEscape } from "@/lib/hooks";
+import { BrandMark } from "./BrandMark";
 
 export function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [password, setPassword] = useState("");
@@ -39,9 +40,7 @@ export function LoginModal({ onClose, onSuccess }: { onClose: () => void; onSucc
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="logodot" style={{ width: 38, height: 38, borderRadius: 11, marginBottom: 15 }}>
-          ◇
-        </div>
+        <BrandMark className="login-brand-mark" />
         <div className="modal-title">管理员登录 · Admin</div>
         <div className="modal-sub">输入管理员密码以访问配额看板</div>
         <input
