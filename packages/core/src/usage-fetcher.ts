@@ -5,6 +5,7 @@ import type { UsageProvider, UsageSnapshot } from "./model";
 import { getDescriptor } from "./registry";
 
 export interface CredentialRecord {
+  provider?: UsageProvider;
   enabled: boolean;
   mode: SourceMode;
   credentials: ProviderCredentials;
@@ -21,10 +22,10 @@ export interface UsageFetchIssue {
   kind: "credentials" | "refresh_rejected" | "rate_limit" | "upstream";
 }
 
-interface Dependencies {
-  load(provider: UsageProvider): CredentialRecord | null;
-  update(provider: UsageProvider, credentials: ProviderCredentials, now: Date, revision: string): string | null;
-  publish(provider: UsageProvider, snapshot: UsageSnapshot | null, error: string | null, now: Date, issue?: UsageFetchIssue): void;
+interface Dependencies<Key extends string> {
+  load(accountId: Key): CredentialRecord | null;
+  update(accountId: Key, credentials: ProviderCredentials, now: Date, revision: string): string | null;
+  publish(accountId: Key, snapshot: UsageSnapshot | null, error: string | null, now: Date, issue?: UsageFetchIssue): void;
   http(provider: UsageProvider): HttpClient;
   descriptor?(provider: UsageProvider): ProviderDescriptor;
   now?(): Date;
@@ -34,21 +35,22 @@ class CredentialsChangedError extends Error {
   constructor() { super("凭据已变更，已忽略旧请求"); }
 }
 
-export function createUsageFetcher(deps: Dependencies): (provider: UsageProvider) => Promise<UsageFetchResult> {
-  const pending = new Map<UsageProvider, { revision: string; promise: Promise<UsageFetchResult> }>();
+export function createUsageFetcher<Key extends string = UsageProvider>(deps: Dependencies<Key>): (accountId: Key) => Promise<UsageFetchResult> {
+  const pending = new Map<Key, { revision: string; promise: Promise<UsageFetchResult> }>();
   const now = deps.now ?? (() => new Date());
 
-  async function run(provider: UsageProvider, initial: CredentialRecord, slot: { revision: string }): Promise<UsageFetchResult> {
+  async function run(accountId: Key, initial: CredentialRecord, slot: { revision: string }): Promise<UsageFetchResult> {
     let current = initial;
+    const provider = initial.provider ?? accountId as UsageProvider;
     const desc = (deps.descriptor ?? getDescriptor)(provider);
     const http = deps.http(provider);
     let refreshed = false;
-    const isCurrent = () => deps.load(provider)?.revision === current.revision;
+    const isCurrent = () => deps.load(accountId)?.revision === current.revision;
     function assertCurrent() {
       if (!isCurrent()) throw new CredentialsChangedError();
     }
     function persist(credentials: ProviderCredentials) {
-      const revision = deps.update(provider, credentials, now(), current.revision);
+      const revision = deps.update(accountId, credentials, now(), current.revision);
       if (revision == null) throw new CredentialsChangedError();
       current = { ...current, credentials, revision };
       slot.revision = revision;
@@ -108,11 +110,11 @@ export function createUsageFetcher(deps: Dependencies): (provider: UsageProvider
         snapshot = await runPipeline(desc, current.mode, current.credentials, { now: now(), http });
       }
       assertCurrent();
-      deps.publish(provider, snapshot, null, now());
+      deps.publish(accountId, snapshot, null, now());
       return { snapshot, error: null };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (isCurrent()) deps.publish(provider, null, message, now(), {
+      if (isCurrent()) deps.publish(accountId, null, message, now(), {
         kind: error instanceof RefreshRejectedError ? "refresh_rejected"
           : error instanceof UnauthorizedError ? "credentials"
           : error instanceof RateLimitedError ? "rate_limit" : "upstream",

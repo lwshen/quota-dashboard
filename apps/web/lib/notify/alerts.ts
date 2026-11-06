@@ -13,6 +13,8 @@ export interface AlertOptions {
   staleSeconds: number;
   recovery: boolean;
   dashboardUrl?: string;
+  accountId?: string;
+  accountLabel?: string;
 }
 
 export type AlertNotice =
@@ -42,7 +44,7 @@ export interface AlertState {
 interface Metric { key: string; level: number; notice: AlertNotice }
 interface Receipt { key: string; token: string; level: number; recovery: boolean }
 
-export function resetHealthAlertState(provider: UsageProvider): void {
+export function resetHealthAlertState(provider: string): void {
   const state = getAlertState<AlertState>(provider, "health");
   if (!state) return;
   state.level = 0;
@@ -112,6 +114,7 @@ export async function processProviderAlerts(
   now: Date, options: AlertOptions, channels: NotifyChannel[], send: Send,
 ): Promise<void> {
   const time = now.getTime();
+  const accountId = options.accountId ?? provider;
   const plans = new Map<string, { channel: NotifyChannel; notices: AlertNotice[]; receipts: Receipt[] }>();
   const schedule = (key: string, state: AlertState, notice: AlertNotice, recovery = false) => {
     for (const channel of channels) {
@@ -128,10 +131,10 @@ export async function processProviderAlerts(
       plan.receipts.push({ key, token, level: state.level, recovery });
       plans.set(channel.name, plan);
     }
-    saveAlertState(provider, key, state);
+    saveAlertState(accountId, key, state);
   };
 
-  const health = getAlertState<AlertState>(provider, "health") ?? { level: 0, failures: 0, channels: {} };
+  const health = getAlertState<AlertState>(accountId, "health") ?? { level: 0, failures: 0, channels: {} };
   if (observation.lastSuccessAt && !health.lastSuccessAt) health.lastSuccessAt = observation.lastSuccessAt;
   if (observation.snapshot) {
     health.level = 0;
@@ -145,13 +148,13 @@ export async function processProviderAlerts(
         delivery.notice = "recovery";
         delivery.sentLevel = 0;
       }
-      saveAlertState(provider, "health", health);
+      saveAlertState(accountId, "health", health);
     }
     const metrics = quotaMetrics(observation.snapshot, options.usageThresholds);
     const balance = balanceMetric(observation.snapshot, options.balanceThreshold);
     if (balance) metrics.push(balance);
     for (const metric of metrics) {
-      const state = getAlertState<AlertState>(provider, metric.key) ?? { level: 0, channels: {} };
+      const state = getAlertState<AlertState>(accountId, metric.key) ?? { level: 0, channels: {} };
       state.level = metric.level;
       schedule(metric.key, state, metric.notice);
     }
@@ -175,17 +178,17 @@ export async function processProviderAlerts(
   }
 
   await Promise.all([...plans.values()].map(async ({ channel, notices, receipts }) => {
-    const isCurrent = (receipt: Receipt) => getAlertState<AlertState>(provider, receipt.key)?.channels[channel.name]?.lease?.token === receipt.token;
+    const isCurrent = (receipt: Receipt) => getAlertState<AlertState>(accountId, receipt.key)?.channels[channel.name]?.lease?.token === receipt.token;
     const active = receipts.filter(isCurrent);
     if (!active.length) return;
     let ok = false;
     try {
-      ok = await send(channel, buildAlertMessage(provider, notices, now, options.dashboardUrl), () => receipts.every(isCurrent));
+      ok = await send(channel, buildAlertMessage(provider, notices, now, options.dashboardUrl, options.accountLabel), () => receipts.every(isCurrent));
     } catch {
       console.error(`[notify] ${channel.name} alert delivery failed`);
     }
     for (const receipt of receipts) {
-      const state = getAlertState<AlertState>(provider, receipt.key);
+      const state = getAlertState<AlertState>(accountId, receipt.key);
       const delivery = state?.channels[channel.name];
       if (!state || !delivery || delivery.lease?.token !== receipt.token) continue;
       delivery.lease = undefined;
@@ -194,7 +197,7 @@ export async function processProviderAlerts(
         delivery.sentLevel = receipt.recovery ? 0 : receipt.level;
         delivery.notice = receipt.recovery ? "recovery" : "problem";
       }
-      saveAlertState(provider, receipt.key, state);
+      saveAlertState(accountId, receipt.key, state);
     }
   }));
 }

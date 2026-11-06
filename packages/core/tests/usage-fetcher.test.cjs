@@ -199,3 +199,46 @@ test("publications carry safe typed issues only after refresh and retry have fai
   await transient.fetch("grok");
   assert.equal(transient.publications[0][4], undefined, "temporary proactive refresh failure preserves still-valid usage");
 });
+
+test("multiple accounts share a provider adapter while isolating token rotation, in-flight work and publication", async () => {
+  const gate = deferred();
+  const records = new Map(["work", "personal"].map((id) => [id, {
+    provider: "codex", enabled: true, mode: "oauth", revision: `revision-${id}`,
+    credentials: { bearerToken: `${id}-old`, refreshToken: `${id}-refresh`, expiresAt: "2020-01-01T00:00:00Z" },
+  }]));
+  const rotations = [], publications = [];
+  const descriptor = {
+    ...core.getDescriptor("codex"), refreshLeadTimeMs: 60_000,
+    refresh: async (creds) => {
+      rotations.push(creds.refreshToken);
+      await gate.promise;
+      return { credentials: { ...creds, bearerToken: creds.bearerToken.replace("old", "new"), refreshToken: `${creds.refreshToken}-rotated`, expiresAt: "2030-01-01T00:00:00Z" } };
+    },
+    resolveStrategies: () => [{ id: "test", sourceMode: "oauth", isAvailable: () => true, shouldFallback: () => false,
+      fetch: async (creds) => ({ provider: "codex", primary: { usedPercent: creds.bearerToken.startsWith("work") ? 20 : 90 } }) }],
+  };
+  const fetch = core.createUsageFetcher({
+    load: (id) => records.get(id),
+    update: (id, credentials, _now, revision) => {
+      const old = records.get(id);
+      if (old?.revision !== revision) return null;
+      const nextRevision = `${revision}-rotated`;
+      records.set(id, { ...old, credentials, revision: nextRevision });
+      return nextRevision;
+    },
+    publish: (...args) => publications.push(args), http: () => ({}),
+    descriptor: (provider) => { assert.equal(provider, "codex"); return descriptor; },
+  });
+  const work = fetch("work"), personal = fetch("personal");
+  assert.equal(work, fetch("work"));
+  assert.notEqual(work, personal);
+  await Promise.resolve();
+  assert.deepEqual(rotations.sort(), ["personal-refresh", "work-refresh"]);
+  gate.resolve();
+  const [a, b] = await Promise.all([work, personal]);
+  assert.equal(a.snapshot.primary.usedPercent, 20);
+  assert.equal(b.snapshot.primary.usedPercent, 90);
+  assert.equal(records.get("work").credentials.refreshToken, "work-refresh-rotated");
+  assert.equal(records.get("personal").credentials.refreshToken, "personal-refresh-rotated");
+  assert.deepEqual(publications.map(([id, snapshot]) => [id, snapshot.provider]).sort(), [["personal", "codex"], ["work", "codex"]]);
+});

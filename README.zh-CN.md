@@ -47,17 +47,16 @@ quota-dashboard/
 | **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | 余额（无窗口）                                |
 | **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/全部模型/routines 窗口 + extra 花费     |
 | **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d/Spark 窗口 + Credits 余额与工作区月额度 |
-| **Codex #2** | 同 Codex，独立槽位（第二个 ChatGPT 账号）          | 同 Codex                             | 同 Codex                                      |
 | **Grok**     | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                | 额度用量、重置时间、产品明细、套餐及预付余额  |
 | **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | 余额（无窗口）                                |
 
-凭据获取方式见各 `providers/*.ts` 顶部注释。在渠道配置中，Claude 和两个 Codex 槽位均支持选择 JSON 文件或粘贴 JSON 字符串，可使用本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 的完整内容、其中的 `claudeAiOauth` / `tokens` 对象，或扁平的 Token 对象。导入后会填入表单供检查，包含可用的 Refresh Token 和 Codex Account ID，检查后再保存。JSON 在浏览器内解析（最大 1 MB），保存时仅提交支持的凭据字段，也可继续手动填写。
+凭据获取方式见各 `providers/*.ts` 顶部注释。在账号配置中，Claude 和所有 Codex 账号均支持选择 JSON 文件或粘贴 JSON 字符串，可使用本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 的完整内容、其中的 `claudeAiOauth` / `tokens` 对象，或扁平的 Token 对象。导入后会填入表单供检查，包含可用的 Refresh Token 和 Codex Account ID，检查后再保存。JSON 在浏览器内解析（最大 1 MB），保存时仅提交支持的凭据字段，也可继续手动填写。
 
 Kimi 会话窗口按 API 实际时长显示，各窗口独立标记未知用量。Claude 模型周限额即使报告 `is_active=false` 也会显示，并按模型身份区分配额，避免误判重置。
 
 Codex 额度使用原生 **Credits** 单位，同时展示月额度和独立购买的余额，不重复计算接口返回的同一月额度剩余值。如果工作区报告 spend controls 却没有可用月额度，则追加同账户的月用量查询，最多等待 6 秒；该可选查询失败不会影响主配额和余额。
 
-Claude 和两个 Codex 槽位均识别永久 OAuth 续期失败，包括嵌套错误码。凭据被拒绝后暂停使用，替换凭据后恢复；临时故障仍按原有策略退避重试。成功续期时保存轮换后的 token 和服务端提供的有效期，Codex 不再假定固定 8 天有效期。
+Claude 和所有 Codex 账号均识别永久 OAuth 续期失败，包括嵌套错误码。凭据被拒绝后暂停使用，替换凭据后恢复；临时故障仍按原有策略退避重试。成功续期时保存轮换后的 token 和服务端提供的有效期，Codex 不再假定固定 8 天有效期。
 
 ### Grok 凭据与用量
 
@@ -106,9 +105,17 @@ pnpm dev          # http://localhost:3000
 
 想手动配置：`cp apps/web/.env.example apps/web/.env`，再把 `openssl rand -hex 32` 的结果填进 `APP_ENC_KEY`。
 
-管理员登录后，打开「渠道管理」查看各渠道的启用、凭据和用量获取状态。点击某个渠道的「配置凭据」或「管理凭据」进入详情；首页卡片上的「配置」也会直接打开该渠道详情。后台每 `POLL_INTERVAL_SECONDS` 秒自动刷新已启用且配置过凭据的渠道。
+## 多账号管理
 
-管理员登录后，点击顶部「渠道管理」可单独关闭或重新开启渠道。关闭后，所有访客的首页均隐藏该渠道，后台轮询和手动刷新也会跳过它；已经发出的请求仍可完成。凭据与历史快照保留，开关保存到 SQLite，刷新页面或重启服务后仍然有效。即使尚未配置凭据，也可以关闭渠道；更新凭据不会自动重新开启它。重新开启后立即恢复显示，并在下一次轮询或手动刷新时更新用量。`ENABLE_POLLER=false` 时仍不会启动后台轮询。
+管理员登录后，打开顶部「账号管理」，点击「新增账号」，选择服务商并填写别名，可选择已有分组或输入新分组，然后配置该账号的凭据。同一服务商可以自由添加多个账号，Codex 不再限制为两个槽位。别名与分组各最多 80 字，可使用相同别名；各账号由独立 ID 区分。
+
+首页按分组展示账号卡片（未设置分组的显示为「未分组」）。账号详情支持修改别名、分组、配置凭据和单独获取用量；列表支持按分组、待配置或获取失败筛选。别名与分组会显示在公开只读看板，账户邮箱、余额等仍遵循管理员可见规则。
+
+每个账号独立保存凭据、OAuth 续期状态、用量、历史记录和通知冷却。更改别名或分组不会清除这些数据。停用账号只影响该账号的显示、轮询和提醒，凭据与历史保留；重新保存凭据不会自动启用账号。删除账号需要在详情中确认，只清除该账号的数据，不影响同服务商的其他账号。`ENABLE_POLLER=false` 仍会全局关闭后台轮询。
+
+升级时自动迁移已保存的旧渠道记录：原 `codex` / `codex2` 保留原存储 ID，均归类为 Codex，默认别名为「Codex」／「Codex #2」；其他已配置渠道也迁移为普通账号。凭据密文、历史数据、启停设置和提醒状态保留，无需重新导入；迁移可重复执行，不会重复创建账号或恢复已删除账号。全新数据库不预置固定账号。
+
+管理接口 `GET/POST/PATCH/DELETE /api/accounts` 仅管理员可用；凭据、定向刷新和历史请求使用账号的 `accountId`。此 ID 是看板账号 ID，与凭据字段中的 ChatGPT Account ID 不同。`GET /api/providers` 只列出服务商模板，不再列出独立的 Codex #2 模板。旧请求中的 `provider` 参数仍兼容迁移前的存储 ID。
 
 凭据填写后直接保存，无需选择保存方式。重新保存已有渠道时，需要填写完整凭据；本次提交会覆盖原凭据，可选字段留空会清除旧值，并清除旧的用量快照和历史记录，避免混用不同账户的 Token。切换渠道、返回列表或关闭面板时，未保存的输入会清空，不会写入浏览器存储。
 
@@ -118,11 +125,11 @@ pnpm dev          # http://localhost:3000
 
 ## 历史曲线
 
-点击渠道卡片底部的「历史曲线」，可切换近 24 小时、7 天和 30 天，选择不同配额窗口，并查看最近记录、最低值和最高值。图中圆点标记检测到的配额重置，悬停或聚焦图表后按左右方向键可查看采样时间与数值。时间使用浏览器本地时区。
+点击账号卡片底部的「历史曲线」，可切换近 24 小时、7 天和 30 天，选择不同配额窗口，并查看最近记录、最低值和最高值。图中圆点标记检测到的配额重置，悬停或聚焦图表后按左右方向键可查看采样时间与数值。时间使用浏览器本地时区。
 
 历史直接读取已有的 `snapshot_history`，无需重新配置凭据。未知用量、窗口消失和超过正常采集间隔的空档会断线显示；不同模型或时长的窗口分开记录。长时间范围按时间分桶保留端点、峰值、低值和重置点，避免向浏览器发送全部原始快照。只有一条有效记录时显示单点，尚无数据时显示空状态。
 
-余额和周期已用金额仅管理员可见，支持 Credits 及各渠道原有的计价单位，包括 Moonshot / RightAPI 的旧余额快照；访客只能查看配额比例历史。接口 `GET /api/history?provider=codex&range=24h` 接受 `24h`、`7d`、`30d`，不返回账户身份或原始上游响应，停用渠道不可查询。
+余额和周期已用金额仅管理员可见，支持 Credits 及各渠道原有的计价单位，包括 Moonshot / RightAPI 的旧余额快照；访客只能查看配额比例历史。接口 `GET /api/history?accountId=<账号ID>&range=24h` 接受 `24h`、`7d`、`30d`，不返回账户身份或原始上游响应，停用渠道不可查询。
 
 ## 配额重置提醒
 
@@ -157,12 +164,12 @@ NOTIFY_MIN_USED_PERCENT=80   # 仅提醒此前用量达到该百分比的窗口�
 
 同一渠道的一次采集触发多个预警时合并发送。相同指标、通知渠道的未解决预警默认每 **6 小时**最多重复一次，达到更高百分比或升级为凭据问题时立即提醒；低于阈值后短时间再次越线仍受冷却限制。去重、失败计数与投递状态保存在 SQLite 的 `notification_alert_state` 表，重启后继续有效。发送失败不会记为已送达，下次采集会重试；每个通知渠道独立记录结果。
 
-余额阈值默认关闭，需按服务商的原始单位单独配置。例如 Codex 的单位是 Credits，Moonshot 随地区为美元或人民币，不做币种换算：
+余额阈值默认关闭，需按服务商的原始单位单独配置（同一服务商的所有账号共享阈值，通知去重按账号隔离）。例如 Codex 的单位是 Credits，Moonshot 随地区为美元或人民币，不做币种换算：
 
 ```dotenv
 NOTIFY_ALERTS_ENABLED=true
 NOTIFY_USAGE_THRESHOLDS=80,95
-NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100,"codex2":100}
+NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100}
 NOTIFY_FAILURE_THRESHOLD=3
 NOTIFY_COOLDOWN_SECONDS=21600
 NOTIFY_STALE_SECONDS=1800

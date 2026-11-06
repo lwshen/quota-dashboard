@@ -1,7 +1,7 @@
 import type { QuotaResetEvent, UsageFetchIssue, UsageProvider, UsageSnapshot } from "@quota/core";
 import { detectQuotaResets } from "@quota/core";
 import { ENV } from "../env";
-import { getAlertState, getCredential, historyFor, listCredentials } from "../store";
+import { getAccount, getAlertState, getCredential, historyFor, listCredentials } from "../store";
 import { FeishuChannel } from "./feishu";
 import { buildQuotaResetMessage, buildStartupMessage, buildTestMessage } from "./message";
 import type { NotifyChannel, NotifyDeliveryResult, NotifyMessage } from "./types";
@@ -43,10 +43,13 @@ async function sendWithRetry(ch: NotifyChannel, message: NotifyMessage, current 
   }
 }
 
-function alertOptions(provider: UsageProvider): AlertOptions {
+function alertOptions(accountId: string, provider: UsageProvider): AlertOptions {
+  const account = getAccount(accountId);
   return {
+    accountId,
+    accountLabel: account ? [account.groupName, account.alias].filter(Boolean).join(" · ") : undefined,
     usageThresholds: ENV.notifyUsageThresholds,
-    balanceThreshold: ENV.notifyBalanceThresholds[provider],
+    balanceThreshold: ENV.notifyBalanceThresholds[accountId] ?? ENV.notifyBalanceThresholds[provider],
     failureThreshold: ENV.notifyFailureThreshold,
     cooldownSeconds: ENV.notifyCooldownSeconds,
     staleSeconds: Math.max(ENV.notifyStaleSeconds, 3 * Math.max(60, ENV.pollInterval)),
@@ -55,11 +58,13 @@ function alertOptions(provider: UsageProvider): AlertOptions {
   };
 }
 
-export function detectAndNotifyAlerts(provider: UsageProvider, snapshot: UsageSnapshot | null, issue: UsageFetchIssue | undefined, now: Date): void {
+export function detectAndNotifyAlerts(accountId: string, snapshot: UsageSnapshot | null, issue: UsageFetchIssue | undefined, now: Date): void {
   try {
-    if (!ENV.notifyAlertsEnabled || !notificationsEnabled() || !getCredential(provider)?.enabled) return;
-    const lastSuccessAt = snapshot ? undefined : historyFor(provider, 1)[0]?.fetchedAt;
-    void processProviderAlerts(provider, { snapshot, issue, lastSuccessAt }, now, alertOptions(provider), channels(), sendWithRetry)
+    if (!ENV.notifyAlertsEnabled || !notificationsEnabled()) return;
+    const credential = getCredential(accountId);
+    if (!credential?.enabled) return;
+    const lastSuccessAt = snapshot ? undefined : historyFor(accountId, 1)[0]?.fetchedAt;
+    void processProviderAlerts(credential.provider, { snapshot, issue, lastSuccessAt }, now, alertOptions(accountId, credential.provider), channels(), sendWithRetry)
       .catch(() => console.error("[notify] alert processing failed"));
   } catch {
     console.error("[notify] alert processing failed");
@@ -70,11 +75,11 @@ export function checkAndNotifyStaleUsage(now: Date): void {
   try {
     if (!ENV.notifyAlertsEnabled || !notificationsEnabled()) return;
     for (const credential of listCredentials().filter((item) => item.enabled)) {
-      const health = getAlertState<AlertState>(credential.provider, "health");
-      const lastSuccessAt = historyFor(credential.provider, 1)[0]?.fetchedAt;
+      const health = getAlertState<AlertState>(credential.accountId, "health");
+      const lastSuccessAt = historyFor(credential.accountId, 1)[0]?.fetchedAt;
       const since = lastSuccessAt ?? health?.firstFailureAt ?? credential.updatedAt;
       void processProviderAlerts(credential.provider, { staleSince: since, lastSuccessAt }, now,
-        alertOptions(credential.provider), channels(), sendWithRetry)
+        alertOptions(credential.accountId, credential.provider), channels(), sendWithRetry)
         .catch(() => console.error("[notify] stale detection failed"));
     }
   } catch {
@@ -102,13 +107,13 @@ async function dispatch(message: NotifyMessage): Promise<NotifyDeliveryResult[]>
 const recentlyNotified = new Map<string, number>();
 const DEDUP_WINDOW_MS = 10 * 60 * 1000;
 
-function withoutRecentDuplicates(events: QuotaResetEvent[], now: Date): QuotaResetEvent[] {
+function withoutRecentDuplicates(events: QuotaResetEvent[], now: Date, accountId: string): QuotaResetEvent[] {
   const t = now.getTime();
   for (const [key, at] of recentlyNotified) {
     if (t - at > DEDUP_WINDOW_MS) recentlyNotified.delete(key);
   }
   return events.filter((e) => {
-    const key = `${e.provider}:${e.laneId}`;
+    const key = `${accountId}:${e.laneId}`;
     if (recentlyNotified.has(key)) return false;
     recentlyNotified.set(key, t);
     return true;
@@ -120,10 +125,10 @@ function withoutRecentDuplicates(events: QuotaResetEvent[], now: Date): QuotaRes
  * Must run BEFORE saveSnapshot persists `next`, which overwrites the comparison base.
  * Reads synchronously, sends fire-and-forget; never throws.
  */
-export function detectAndNotifyResets(provider: UsageProvider, next: UsageSnapshot, now: Date): void {
+export function detectAndNotifyResets(accountId: string, next: UsageSnapshot, now: Date): void {
   try {
-    if (!notificationsEnabled()) return;
-    const prev = historyFor(provider, 1)[0];
+    if (!notificationsEnabled() || !getAccount(accountId)?.enabled) return;
+    const prev = historyFor(accountId, 1)[0];
     if (!prev) return;
     // A stale base (fetch-error streak, host sleep, poller off) is not comparable:
     // rolling windows decay across the gap, which would read as a reset.
@@ -132,10 +137,11 @@ export function detectAndNotifyResets(provider: UsageProvider, next: UsageSnapsh
     if (now.getTime() - new Date(prev.fetchedAt).getTime() > maxAgeMs) return;
     const events = withoutRecentDuplicates(
       detectQuotaResets(prev.snapshot, next, { minUsedPercent: ENV.notifyMinUsedPercent }),
-      now,
+      now, accountId,
     );
     if (events.length === 0) return;
-    void dispatch(buildQuotaResetMessage(events, now));
+    const account = getAccount(accountId);
+    void dispatch(buildQuotaResetMessage(events, now, account ? [account.groupName, account.alias].filter(Boolean).join(" · ") : undefined));
   } catch (e) {
     console.error("[notify] reset detection failed:", e);
   }

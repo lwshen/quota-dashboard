@@ -63,7 +63,7 @@ export function Header({
         </button>
         {authed && (
           <button type="button" className="tgl" onClick={onManageProviders}>
-            渠道管理
+            账号管理
           </button>
         )}
         <div style={{ position: "relative" }}>
