@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatClock } from "@/lib/format";
 import { useOnEscape } from "@/lib/hooks";
+import { BrandMark } from "./BrandMark";
 
 export function Header({
   now,
@@ -47,7 +48,7 @@ export function Header({
   return (
     <div className="hdr">
       <div className="row" style={{ gap: 13 }}>
-        <span className="logodot">◇</span>
+        <BrandMark />
         <div>
           <div className="h-title">Quota Dashboard</div>
           <div className="h-sub">AI 服务商配额 · 用量看板</div>

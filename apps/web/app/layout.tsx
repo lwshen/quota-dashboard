@@ -20,6 +20,10 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Quota Dashboard",
   description: "AI 服务商配额 / 用量看板",
+  icons: {
+    icon: "/brand/quota-mark.png",
+    apple: "/brand/quota-mark.png",
+  },
 };
 
 // Applies the persisted theme before first paint to avoid a flash of the default theme.
