@@ -133,3 +133,14 @@ export function historyFor(provider: UsageProvider, limit = 200): { snapshot: Us
     .all(provider, limit) as { snapshot: string; fetched_at: string }[];
   return rows.reverse().map((r) => ({ snapshot: JSON.parse(r.snapshot) as UsageSnapshot, fetchedAt: r.fetched_at }));
 }
+
+export function* historyInRange(provider: UsageProvider, from: Date, to: Date): Generator<{ snapshot: UsageSnapshot; fetchedAt: string }> {
+  // Stream indexed rows so a long range never loads every raw upstream response into memory.
+  const rows = db().prepare(`SELECT snapshot, fetched_at FROM snapshot_history
+    WHERE provider=? AND fetched_at>=? AND fetched_at<=? ORDER BY fetched_at ASC, id ASC`)
+    .iterate(provider, from.toISOString(), to.toISOString());
+  for (const row of rows) {
+    const r = row as { snapshot: string; fetched_at: string };
+    yield { snapshot: JSON.parse(r.snapshot) as UsageSnapshot, fetchedAt: r.fetched_at };
+  }
+}

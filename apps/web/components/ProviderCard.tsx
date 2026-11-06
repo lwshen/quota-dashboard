@@ -20,11 +20,13 @@ export function ProviderCard({
   now,
   authed,
   onConfigure,
+  onHistory,
 }: {
   view: ProviderView;
   now: number;
   authed: boolean;
   onConfigure?: (provider: string) => void;
+  onHistory?: (provider: string) => void;
 }) {
   const s = view.snapshot;
   const { name, tag } = splitLabel(view.label);
@@ -159,13 +161,15 @@ export function ProviderCard({
       ) : null}
 
       <div className="stamp">
-        {onConfigure ? (
-          <button type="button" className="cfglink" onClick={() => onConfigure(view.provider)}>
-            配置 · configure
-          </button>
-        ) : (
-          <span />
-        )}
+        <div className="card-actions">
+          {onHistory && <button type="button" className="cfglink history-link" onClick={() => onHistory(view.provider)}
+            aria-label={`查看 ${view.label} 历史曲线`}>历史曲线</button>}
+          {onConfigure && (
+            <button type="button" className="cfglink" onClick={() => onConfigure(view.provider)}>
+              配置 · configure
+            </button>
+          )}
+        </div>
         <span>{view.fetchedAt ? `更新 ${new Date(view.fetchedAt).toLocaleTimeString()}` : "—"}</span>
       </div>
     </div>
