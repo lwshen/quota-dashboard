@@ -41,13 +41,14 @@ Each provider is a **`ProviderDescriptor`** that resolves to an ordered list of 
 2. Register it in `providers/index.ts` and `registry.ts` (`DESCRIPTORS`).
 3. Add the name to the `UsageProvider` union in `model.ts`.
 
-UI and backend need no changes — credential form fields and card rendering are driven by descriptor metadata.
+UI and backend use provider descriptor metadata. The account registry stores independent IDs, aliases, groups and enabled states; many accounts can share one provider descriptor. `codex2` is a legacy compatibility alias, excluded from `listDescriptors()`.
 
 ### Request/data flow in `apps/web`
 
 - `middleware.ts` gates **all** pages and `/api/*` (auth + per-IP rate limit) before anything else runs.
+- `GET/POST/PATCH/DELETE /api/accounts` → administrator-only account CRUD; provider is immutable, alias/group changes preserve credentials and history.
 - `POST /api/credentials` → validates fields per descriptor, SSRF-checks any `baseUrlOverride`, encrypts and stores the credential, then fetches once immediately.
-- `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`.
+- `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`. Requests and in-flight work are keyed by dashboard account ID; provider adapters are selected from the credential record's provider.
 - `lib/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
 - `GET /api/usage` → returns stored snapshots with UI-safe fields only (raw upstream `extra` is stripped).
 - `lib/notify/` → quota-reset, low-quota, credential/fetch-failure, stale-data, and recovery notifications. `fetchAndStore` invokes detection **before** `saveSnapshot`; fetch issues are typed in core, never classified by matching raw error strings. `notify/alerts.ts` groups warnings and persists per-channel cooldowns/delivery reservations in `notification_alert_state`. The poller also checks stale data. Channels implement `NotifyChannel` and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
@@ -55,7 +56,7 @@ UI and backend need no changes — credential form fields and card rendering are
 ## Conventions & gotchas
 
 - **`lib/auth.ts` runs in both the edge (middleware) and Node (route) runtimes**, so it uses only Web Crypto / `btoa` / `TextEncoder` — do not introduce Node-only APIs there. Sessions are stateless: an expiry signed with HMAC-SHA256 in an httpOnly cookie.
-- **`better-sqlite3` is a native module**: it's in `serverExternalPackages` (not bundled) and `onlyBuiltDependencies` (pnpm builds it; `sharp` is disabled). Storage is hand-written SQL via better-sqlite3 — there is no ORM or migration tooling. History is kept in the `snapshot_history` table.
+- **`better-sqlite3` is a native module**: it's in `serverExternalPackages` (not bundled) and `onlyBuiltDependencies` (pnpm builds it; `sharp` is disabled). Storage is hand-written SQL via better-sqlite3. `db.ts` idempotently migrates legacy slots into `accounts`; legacy `provider` columns in credential/snapshot/history/alert tables now store account IDs. `codex2` snapshots normalize to provider `codex` when read, without rewriting history or ciphertext. Keep these storage keys separate from `UsageSnapshot.provider` and the upstream ChatGPT Account ID credential field.
 - **SSRF protection is two layers**: `core/src/net.ts` does synchronous literal checks (https-only, no userinfo, reject private/loopback/link-local/CGNAT/cloud-metadata IPs); `apps/web/lib/ssrf.ts` adds DNS resolution. Known limitation: the literal-only check at fetch time leaves a TOCTOU / DNS-rebinding gap (validation isn't pinned to the connecting IP).
 - **Auth is fail-closed**: if `DASHBOARD_PASSWORD` is unset, `middleware.ts` blocks everything. `AUTH_DISABLED=true` is local-dev only.
 - **Credentials are AES-256-GCM encrypted (`lib/crypto.ts`) and never returned to the frontend.** `APP_ENC_KEY` is the master key.

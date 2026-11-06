@@ -5,8 +5,9 @@ import { parseGrokAuthFile, type GrokAuthImport } from "@quota/core/grok-auth";
 import { credentialStatus, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
 import { CredentialJsonImport } from "./CredentialJsonImport";
 
-export function AddCredentialForm({ provider, credential, onBusyChange, onSaved }: {
+export function AddCredentialForm({ provider, accountId, credential, onBusyChange, onSaved }: {
   provider: ProviderMeta;
+  accountId?: string;
   credential?: CredentialMeta;
   onBusyChange: (busy: boolean) => void;
   onSaved: () => Promise<void>;
@@ -48,7 +49,7 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
 
   async function reloadAfterSave() {
     try { await onSaved(); }
-    catch { setFeedback({ text: "操作已完成，但状态更新失败。请返回渠道列表重新加载。", error: true }); }
+    catch { setFeedback({ text: "操作已完成，但状态更新失败。请返回账号列表重新加载。", error: true }); }
   }
 
   async function submit(event: FormEvent) {
@@ -70,7 +71,7 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
     try {
       const res = await fetch("/api/credentials", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: provider.provider, fields, action: "replace" }),
+        body: JSON.stringify({ accountId: accountId ?? provider.provider, fields, action: "replace" }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -83,7 +84,7 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
       setAccounts([]);
       setScope("");
       setFeedback(data.disabled
-        ? { text: "凭据已保存。此渠道尚未启用，未获取用量；可在下方启用并获取用量。" }
+        ? { text: "凭据已保存。此账号尚未启用，未获取用量；可在下方启用并获取用量。" }
         : data.result?.error
           ? { text: `凭据已保存，但获取用量失败：${data.result.error}`, error: true }
           : { text: "凭据已保存，已获取最新用量。" });
@@ -99,21 +100,21 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
     let enabled = false;
     try {
       if (enable) {
-        const res = await fetch("/api/providers", {
+        const res = await fetch("/api/accounts", {
           method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider: provider.provider, enabled: true }),
+          body: JSON.stringify({ accountId: accountId ?? provider.provider, enabled: true }),
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "启用失败，请重试");
         enabled = true;
       }
       const res = await fetch("/api/refresh", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: provider.provider }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accountId: accountId ?? provider.provider }),
       });
       const data = await res.json();
       if (!res.ok || data.result?.error) throw new Error(data.error ?? data.result?.error ?? "获取失败，请重试");
-      setFeedback({ text: enable ? "渠道已启用，已获取最新用量。" : "已获取最新用量。" });
+      setFeedback({ text: enable ? "账号已启用，已获取最新用量。" : "已获取最新用量。" });
     } catch (e) {
-      setFeedback({ text: `${enabled ? "渠道已启用，但获取用量失败：" : ""}${e instanceof Error ? e.message : "获取失败，请重试"}`, error: true });
+      setFeedback({ text: `${enabled ? "账号已启用，但获取用量失败：" : ""}${e instanceof Error ? e.message : "获取失败，请重试"}`, error: true });
     } finally {
       await reloadAfterSave();
       setWorking(false);
@@ -154,8 +155,8 @@ export function AddCredentialForm({ provider, credential, onBusyChange, onSaved 
 
   return (
     <form ref={form} className="credential-form" onSubmit={submit} noValidate aria-label={`${provider.label} 凭据`}>
-      <section className="credential-status" aria-label="渠道状态">
-        <div className="credential-status-heading"><strong>{provider.enabled ? "渠道已启用" : "渠道已停用"}</strong><span className={`management-badge ${status.tone}`}><span className={`management-status-dot ${status.tone}`} aria-hidden="true" />{status.label}</span></div>
+      <section className="credential-status" aria-label="账号状态">
+        <div className="credential-status-heading"><strong>{provider.enabled ? "账号已启用" : "账号已停用"}</strong><span className={`management-badge ${status.tone}`}><span className={`management-status-dot ${status.tone}`} aria-hidden="true" />{status.label}</span></div>
         <p className="management-help">{credential?.fetchedAt ? `最近获取：${new Date(credential.fetchedAt).toLocaleString("zh-CN")}` : "尚未获取用量。"}</p>
         {credential?.fetchError && <p className="credential-error">上次获取失败：{credential.fetchError}</p>}
         {!provider.enabled && <p className="management-help">停用期间仅保存凭据，不会获取用量。启用后才会恢复显示和刷新。</p>}

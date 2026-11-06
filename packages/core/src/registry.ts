@@ -22,7 +22,7 @@ export function getDescriptor(p: UsageProvider): ProviderDescriptor {
 }
 
 export function listDescriptors(): ProviderDescriptor[] {
-  return ALL_PROVIDERS.map((p) => DESCRIPTORS[p]);
+  return ALL_PROVIDERS.filter((p) => p !== "codex2").map((p) => DESCRIPTORS[p]);
 }
 
 export function isProvider(v: string): v is UsageProvider {

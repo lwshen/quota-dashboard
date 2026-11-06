@@ -41,23 +41,22 @@ quota-dashboard/
 
 ## Implemented providers
 
-| Provider     | Path                                                     | Credentials                          | Output                                                               |
-| ------------ | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
-| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)               | Bearer key                           | Weekly/session quotas + monthly total; ratio pools and legacy counts |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                         | Bearer key                           | Balance (no window)                                                  |
-| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)        | access token (+refresh)              | 5h/7d/all model-scoped/routines windows + extra spend                |
-| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`)       | access token + account id (+refresh) | 5h/7d + Spark windows; Credits balance and workspace monthly cap     |
-| **Codex #2** | Same as Codex, independent slot (second ChatGPT account) | same as Codex                        | same as Codex                                                        |
-| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback         | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance  |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`)                      | user token                           | Balance (no window)                                                  |
+| Provider     | Path                                               | Credentials                          | Output                                                               |
+| ------------ | -------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                           | Weekly/session quotas + monthly total; ratio pools and legacy counts |
+| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | Balance (no window)                                                  |
+| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/all model-scoped/routines windows + extra spend                |
+| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d + Spark windows; Credits balance and workspace monthly cap     |
+| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback   | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance  |
+| **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | Balance (no window)                                                  |
 
-See the comment at the top of each `providers/*.ts` for how to obtain credentials. In channel settings, Claude and both Codex slots support importing a JSON file or pasting a JSON string from `~/.claude/.credentials.json` or `~/.codex/auth.json`. Full credential files, their `claudeAiOauth` / `tokens` objects, and flat token objects are supported. Imports fill the form for review before saving, including refresh tokens and Codex account IDs when present. Parsing happens in the browser (1 MB maximum); only supported credential fields are submitted when you save. Manual entry remains available.
+See the comment at the top of each `providers/*.ts` for how to obtain credentials. In account settings, Claude and all Codex accounts support importing a JSON file or pasting a JSON string from `~/.claude/.credentials.json` or `~/.codex/auth.json`. Full credential files, their `claudeAiOauth` / `tokens` objects, and flat token objects are supported. Imports fill the form for review before saving, including refresh tokens and Codex account IDs when present. Parsing happens in the browser (1 MB maximum); only supported credential fields are submitted when you save. Manual entry remains available.
 
 Kimi session labels follow the API's actual duration. Missing usage stays unknown for each window independently. Claude model-scoped weekly limits are displayed even when their `is_active` flag is false; model identity keeps separate quotas from being compared as resets.
 
 Codex credit amounts use the native **Credits** unit. Monthly caps and independent purchased balances are shown together; a repeated monthly remainder is not counted twice. When a workspace advertises spend controls but omits a usable cap, an account-scoped monthly-usage lookup runs with a six-second budget. Failure of this optional lookup preserves the main quota and balance.
 
-Claude and both Codex slots recognize permanent OAuth refresh failures, including nested error codes. Polling stops using the rejected credential until it is replaced; temporary failures retain the existing retry backoff. Successful renewals save rotated tokens and the server-provided expiry, with no fixed eight-day lifetime assumption for Codex.
+Claude and all Codex accounts recognize permanent OAuth refresh failures, including nested error codes. Polling stops using the rejected credential until it is replaced; temporary failures retain the existing retry backoff. Successful renewals save rotated tokens and the server-provided expiry, with no fixed eight-day lifetime assumption for Codex.
 
 ### Grok credentials and usage
 
@@ -113,9 +112,17 @@ pnpm dev          # http://localhost:3000
 
 Prefer to do it by hand? `cp apps/web/.env.example apps/web/.env`, then put an `openssl rand -hex 32` value in `APP_ENC_KEY`.
 
-Sign in as an administrator and open **渠道管理** (Channels) to see each provider's enabled state, credential status, and usage-fetch result. Choose **配置凭据** (Configure credentials) or **管理凭据** (Manage credentials) to open its details. A dashboard card's Configure action opens the same detail view. The background poller refreshes enabled, configured providers every `POLL_INTERVAL_SECONDS` seconds.
+## Multiple accounts
 
-After signing in as an administrator, click **渠道管理** (Channels) in the header to disable or re-enable individual providers. Disabled providers are hidden from every visitor and skipped by both background polling and manual refresh; requests already in progress may finish. Credentials and history are retained. Settings persist in SQLite across page reloads and server restarts, including for providers without credentials. Updating credentials does not re-enable a disabled provider. Re-enabling restores its card immediately; usage updates on the next poll or manual refresh. `ENABLE_POLLER=false` still disables background polling globally.
+Sign in as an administrator, open **账号管理** (Accounts), and choose **新增账号** (Add account). Select a provider, enter an alias, optionally choose an existing group or type a new one, then configure credentials. Any provider can have multiple accounts; Codex is no longer limited to two slots. Aliases and groups accept up to 80 characters. Duplicate aliases are allowed; independent IDs distinguish accounts.
+
+The dashboard groups account cards, placing accounts without a group under **未分组** (Ungrouped). Account details support renaming, regrouping, credential configuration, and targeted refreshes. Filter the list by group, missing credentials, or fetch errors. Aliases and groups appear on the public read-only dashboard; emails and balances retain their administrator-only visibility.
+
+Credentials, OAuth renewal state, usage, history, and notification cooldowns are isolated per account. Renaming or regrouping preserves these records. Disabling an account hides and stops polling/notifying only that account while retaining credentials and history; saving credentials does not re-enable it. Deleting requires confirmation and removes only the selected account's data. `ENABLE_POLLER=false` still disables background polling globally.
+
+Existing stored channels migrate automatically. Legacy `codex` / `codex2` retain their storage IDs and become ordinary Codex accounts with default aliases **Codex** / **Codex #2**. Other stored channels become accounts as well. Encrypted credential bytes, history, enabled states, and notification records are preserved without re-importing credentials. Migration is idempotent and does not recreate deleted accounts. Fresh databases have no fixed account slots.
+
+`GET/POST/PATCH/DELETE /api/accounts` is administrator-only. Credential, targeted-refresh, and history requests use the dashboard account's `accountId`, which is separate from the upstream ChatGPT Account ID credential field. `GET /api/providers` lists provider templates without a Codex #2 template. Legacy `provider` request parameters remain compatible with migrated storage IDs.
 
 Enter the complete credentials and save directly; there is no save-mode selector. Saving an existing provider replaces its credentials, clears optional values left blank, and removes previous usage snapshots and history to avoid mixing tokens from different accounts. Unsaved input is cleared when switching providers, returning to the list, or closing the panel. Credentials are never written to browser storage.
 
@@ -125,11 +132,11 @@ To inspect a provider response while debugging, set `DEBUG=true`. Raw quota API 
 
 ## Usage history
 
-Choose **历史曲线** (History) on a provider card to view the past 24 hours, 7 days, or 30 days. Select a quota window to see its latest recorded value, minimum, and maximum. Markers identify detected quota resets. Hover over the chart, or focus it and use the arrow keys, to inspect sample times and values. Times use the browser's local timezone.
+Choose **历史曲线** (History) on an account card to view the past 24 hours, 7 days, or 30 days. Select a quota window to see its latest recorded value, minimum, and maximum. Markers identify detected quota resets. Hover over the chart, or focus it and use the arrow keys, to inspect sample times and values. Times use the browser's local timezone.
 
 Charts read existing `snapshot_history` records without reconfiguring credentials. Unknown usage, missing windows, and long collection gaps break the line; different model identities and window durations stay separate. Longer ranges retain endpoints, minima, maxima, and reset points in time buckets instead of sending every raw snapshot to the browser. A single observation appears as a point; ranges without usable observations show an empty state.
 
-Balances and period spend are visible to administrators only, in each provider's original unit, including Credits and legacy Moonshot / RightAPI balance snapshots. Anonymous visitors can view quota percentages. `GET /api/history?provider=codex&range=24h` accepts `24h`, `7d`, or `30d`, excludes account identity and raw upstream responses, and rejects disabled providers.
+Balances and period spend are visible to administrators only, in each provider's original unit, including Credits and legacy Moonshot / RightAPI balance snapshots. Anonymous visitors can view quota percentages. `GET /api/history?accountId=<account-id>&range=24h` accepts `24h`, `7d`, or `30d`, excludes account identity and raw upstream responses, and rejects disabled providers.
 
 ## Quota-reset notifications
 
@@ -164,12 +171,12 @@ With the Feishu bot configured, background polling and manual refreshes also che
 
 Warnings raised by one provider observation are grouped into one message. An unresolved warning repeats at most every **6 hours** per metric and notification channel; crossing a higher percentage threshold or escalating to a credential problem alerts immediately. Briefly falling below a threshold and crossing again remains subject to the cooldown. SQLite's `notification_alert_state` table persists failure counts, cooldowns, and per-channel delivery state across restarts. Failed sends are retried on later observations rather than marked delivered.
 
-Balance warnings are opt-in, with separate thresholds in each provider's original unit. Codex uses Credits; Moonshot follows its configured region. No currency conversion is performed:
+Balance warnings are opt-in, with separate thresholds in each provider's original unit. Accounts of the same provider share its threshold, with independent notification cooldowns. Codex uses Credits; Moonshot follows its configured region. No currency conversion is performed:
 
 ```dotenv
 NOTIFY_ALERTS_ENABLED=true
 NOTIFY_USAGE_THRESHOLDS=80,95
-NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100,"codex2":100}
+NOTIFY_BALANCE_THRESHOLDS={"moonshot":5,"rightapi":5,"codex":100}
 NOTIFY_FAILURE_THRESHOLD=3
 NOTIFY_COOLDOWN_SECONDS=21600
 NOTIFY_STALE_SECONDS=1800

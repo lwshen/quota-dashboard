@@ -88,7 +88,10 @@ export default function Home() {
     await Promise.all([loadSession(), loadUsage()]);
   }
 
-  const selectedHistoryProvider = views.find((view) => view.provider === historyProvider);
+  const selectedHistoryProvider = views.find((view) => view.accountId === historyProvider);
+  const groupedViews = [...new Set(views.map((view) => view.groupName ?? ""))].map((group) => ({
+    name: group, views: views.filter((view) => (view.groupName ?? "") === group),
+  }));
 
   return (
     <div className="app">
@@ -105,13 +108,16 @@ export default function Home() {
 
         {usageLoaded && views.length === 0 && (
           <div className="qcard">
-            <div className="emptystate">暂无显示的渠道{authed ? "，可在「渠道管理」中开启。" : "。"}</div>
+            <div className="emptystate">暂无显示的账号{authed ? "，可在「账号管理」中添加或启用。" : "。"}</div>
+            {authed && <button type="button" className="management-action account-empty-action" onClick={() => openManagement()}>添加账号</button>}
           </div>
         )}
-        <div className="qgrid">
-          {views.map((v) => (
+        {groupedViews.map((group) => <section className="account-group" key={group.name} aria-label={group.name || "未分组"}>
+          <h2 className="account-group-title">{group.name || "未分组"}<span>{group.views.length} 个账号</span></h2>
+          <div className="qgrid">
+          {group.views.map((v) => (
             <ProviderCard
-              key={v.provider}
+              key={v.accountId}
               view={v}
               now={now}
               authed={authed}
@@ -119,14 +125,15 @@ export default function Home() {
               onHistory={setHistoryProvider}
             />
           ))}
-        </div>
+          </div>
+        </section>)}
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLoginSuccess} />}
 
       {selectedHistoryProvider && (
-        <UsageHistoryDialog key={selectedHistoryProvider.provider} provider={selectedHistoryProvider.provider}
-          label={selectedHistoryProvider.label}
+        <UsageHistoryDialog key={selectedHistoryProvider.accountId} accountId={selectedHistoryProvider.accountId!}
+          label={`${selectedHistoryProvider.alias} · ${selectedHistoryProvider.label}`}
           authed={authed} onClose={() => setHistoryProvider(null)} />
       )}
 

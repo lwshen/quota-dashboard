@@ -3,6 +3,9 @@ import { RateWindowBar } from "./RateWindowBar";
 import { computeBadge, formatCost, laneMeta, parseValueBlock, splitLabel } from "@/lib/format";
 
 export interface ProviderView {
+  accountId?: string;
+  alias?: string;
+  groupName?: string;
   provider: string;
   label: string;
   accentColor: string | null;
@@ -82,13 +85,15 @@ export function ProviderCard({
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="row" style={{ gap: 9 }}>
           <span className="pdot" style={{ background: accent }} />
-          <span className="pname">{name}</span>
-          {tag ? <span className="ptag">{tag}</span> : null}
+          <span className="pname">{view.alias ?? name}</span>
+          {tag && !view.alias ? <span className="ptag">{tag}</span> : null}
         </div>
         <span className={`badge ${badge.tone}`}>
           {badge.icon} {badge.label}
         </span>
       </div>
+
+      {view.alias && <div className="account-provider">{name}{tag ? ` · ${tag}` : ""}</div>}
 
       {email ? <div className="subident">{email}</div> : null}
 
@@ -162,10 +167,10 @@ export function ProviderCard({
 
       <div className="stamp">
         <div className="card-actions">
-          {onHistory && <button type="button" className="cfglink history-link" onClick={() => onHistory(view.provider)}
-            aria-label={`查看 ${view.label} 历史曲线`}>历史曲线</button>}
+          {onHistory && <button type="button" className="cfglink history-link" onClick={() => onHistory(view.accountId ?? view.provider)}
+            aria-label={`查看 ${view.alias ?? view.label} 历史曲线`}>历史曲线</button>}
           {onConfigure && (
-            <button type="button" className="cfglink" onClick={() => onConfigure(view.provider)}>
+            <button type="button" className="cfglink" onClick={() => onConfigure(view.accountId ?? view.provider)}>
               配置 · configure
             </button>
           )}

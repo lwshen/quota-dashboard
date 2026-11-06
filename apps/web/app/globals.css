@@ -1579,3 +1579,118 @@ select.field {
     gap: 8px;
   }
 }
+
+/* ---- multiple provider accounts ---- */
+.account-group + .account-group {
+  margin-top: 28px;
+}
+.account-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+.account-group-title span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.account-provider {
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: 8px;
+}
+.qcard .pname {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.account-empty-action {
+  align-self: center;
+  margin-bottom: 16px;
+}
+.account-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-block: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.account-profile h3,
+.account-danger h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+.account-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--dim);
+}
+.management-dialog .account-label .field {
+  margin: 0;
+  min-height: 44px;
+}
+.management-dialog select.field {
+  appearance: auto;
+}
+.account-form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.account-group-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--dim);
+  font-size: 14px;
+  padding-block: 12px;
+}
+.management-dialog .account-group-filter .field {
+  flex: 1;
+  margin: 0;
+  width: auto;
+}
+.account-form-section {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.account-danger {
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.account-delete {
+  color: var(--management-danger);
+}
+.account-delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.account-delete-confirm p {
+  width: 100%;
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.management-nav-item > span:first-child,
+.provider-setting-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.account-profile input:disabled,
+.account-profile select:disabled {
+  opacity: 0.6;
+}

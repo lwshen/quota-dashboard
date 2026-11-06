@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { listDescriptors } from "@quota/core";
-import { listProviderSettings, listSnapshots } from "@/lib/store";
+import { getDescriptor } from "@quota/core";
+import { listAccounts, listSnapshots } from "@/lib/store";
 import { ENV } from "@/lib/env";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
 
@@ -13,9 +13,9 @@ export async function GET() {
   // identity (which can hold balance / email / org). Authed admins get the full view.
   const authed = ENV.authDisabled || (await verifySessionToken((await cookies()).get(SESSION_COOKIE)?.value));
   const snaps = new Map(listSnapshots().map((s) => [s.provider, s]));
-  const settings = listProviderSettings();
-  const providers = listDescriptors().filter((d) => settings.get(d.provider) !== false).map((d) => {
-    const s = snaps.get(d.provider);
+  const providers = listAccounts().filter((account) => account.enabled).map((account) => {
+    const d = getDescriptor(account.provider);
+    const s = snaps.get(account.id);
     let snapshot = null;
     if (s?.snapshot) {
       // `extra` holds the raw upstream response; drop it so only UI fields are exposed.
@@ -25,6 +25,9 @@ export async function GET() {
       if (!authed) snapshot = { ...snapshot, identity: undefined, providerCost: undefined };
     }
     return {
+      accountId: account.id,
+      alias: account.alias,
+      groupName: account.groupName,
       provider: d.provider,
       label: d.label,
       accentColor: d.accentColor ?? null,
@@ -34,5 +37,5 @@ export async function GET() {
       fetchedAt: s?.fetchedAt ?? null,
     };
   });
-  return NextResponse.json({ providers });
+  return NextResponse.json({ providers }, { headers: { "Cache-Control": "private, no-store" } });
 }

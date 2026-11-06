@@ -15,11 +15,21 @@ export interface ProviderMeta {
 }
 
 export interface CredentialMeta {
+  accountId?: string;
   provider: string;
   configuredKeys: string[];
   updatedAt: string;
   fetchedAt: string | null;
   fetchError: string | null;
+}
+
+export interface AccountMeta {
+  id: string;
+  provider: string;
+  alias: string;
+  groupName: string;
+  enabled: boolean;
+  createdAt: string;
 }
 
 export function credentialStatus(credential?: CredentialMeta) {

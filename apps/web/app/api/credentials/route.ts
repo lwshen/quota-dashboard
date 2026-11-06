@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ProviderCredentials, SourceMode } from "@quota/core";
 import { getDescriptor, isProvider } from "@quota/core";
-import { deleteCredential, getCredential, listCredentials, listSnapshots, saveCredential, updateCredentialSecret } from "@/lib/store";
+import { deleteCredential, getAccount, getCredential, listCredentials, listSnapshots, saveCredential, updateCredentialSecret } from "@/lib/store";
 import { CredentialInputError, prepareCredentialInput } from "@/lib/credential-input";
 import { fetchAndStore } from "@/lib/fetcher";
 import { assertSafeBaseUrl } from "@/lib/ssrf";
@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const snapshots = new Map(listSnapshots().map((s) => [s.provider, s]));
   const credentials = listCredentials().map((c) => ({
+    accountId: c.accountId,
     provider: c.provider,
     enabled: c.enabled,
     mode: c.mode,
@@ -26,14 +27,14 @@ export async function GET() {
       })
       .map((field) => field.key),
     updatedAt: c.updatedAt,
-    fetchedAt: snapshots.get(c.provider)?.fetchedAt ?? null,
-    fetchError: snapshots.get(c.provider)?.error ?? null,
+    fetchedAt: snapshots.get(c.accountId)?.fetchedAt ?? null,
+    fetchError: snapshots.get(c.accountId)?.error ?? null,
   }));
   return NextResponse.json({ credentials });
 }
 
 export async function POST(req: Request) {
-  let body: { provider?: string; mode?: SourceMode; fields?: Record<string, unknown>; action?: "update" | "replace"; clearFields?: string[]; confirmSameAccount?: boolean };
+  let body: { accountId?: string; provider?: string; mode?: SourceMode; fields?: Record<string, unknown>; action?: "update" | "replace"; clearFields?: string[]; confirmSameAccount?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -41,17 +42,22 @@ export async function POST(req: Request) {
   }
 
   if (!body || typeof body !== "object" || Array.isArray(body) ||
+    (body.accountId !== undefined && typeof body.accountId !== "string") ||
+    (body.provider !== undefined && typeof body.provider !== "string") ||
     (body.fields != null && (typeof body.fields !== "object" || Array.isArray(body.fields))) ||
     (body.action != null && body.action !== "update" && body.action !== "replace") ||
     (body.mode != null && !["auto", "api", "oauth", "web"].includes(body.mode)) ||
     (body.clearFields != null && (!Array.isArray(body.clearFields) || body.clearFields.some((key) => typeof key !== "string")))) {
     return NextResponse.json({ error: "凭据请求格式不正确" }, { status: 400 });
   }
-  const provider = body.provider ?? "";
-  if (!isProvider(provider)) return NextResponse.json({ error: "unknown provider" }, { status: 400 });
+  const accountId = body.accountId ?? body.provider ?? "";
+  const account = getAccount(accountId);
+  const provider = account?.provider ?? (body.accountId === undefined && isProvider(accountId) ? accountId : null);
+  if (!provider) return NextResponse.json({ error: "账号不存在" }, { status: 404 });
+  if (body.accountId && body.provider && body.provider !== provider) return NextResponse.json({ error: "服务商与账号不匹配" }, { status: 400 });
 
   const desc = getDescriptor(provider);
-  const existing = getCredential(provider);
+  const existing = getCredential(accountId);
   if (body.action === "update" && body.mode != null && body.mode !== existing?.mode) {
     return NextResponse.json({ error: "修改数据源模式时请替换整套凭据" }, { status: 400 });
   }
@@ -87,22 +93,24 @@ export async function POST(req: Request) {
   }
 
   const now = new Date();
+  if (account && !getAccount(accountId)) return NextResponse.json({ error: "账号已被删除，请重新打开账号管理。" }, { status: 409 });
   if (body.action === "update") {
-    if (!existing || !updateCredentialSecret(provider, creds, now, existing.revision)) {
+    if (!existing || !updateCredentialSecret(accountId, creds, now, existing.revision)) {
       return NextResponse.json({ error: "凭据已被其他请求更新，请重新打开配置后重试" }, { status: 409 });
     }
-    resetHealthAlertState(provider);
+    resetHealthAlertState(accountId);
   } else {
-    saveCredential(provider, mode, creds, now);
+    saveCredential(accountId, mode, creds, now);
   }
-  if (!getCredential(provider)?.enabled) return NextResponse.json({ ok: true, disabled: true });
-  const result = await fetchAndStore(provider);
+  if (!getCredential(accountId)?.enabled) return NextResponse.json({ ok: true, disabled: true });
+  const result = await fetchAndStore(accountId);
   return NextResponse.json({ ok: true, result });
 }
 
 export async function DELETE(req: Request) {
-  const provider = new URL(req.url).searchParams.get("provider") ?? "";
-  if (!isProvider(provider)) return NextResponse.json({ error: "unknown provider" }, { status: 400 });
-  deleteCredential(provider);
+  const params = new URL(req.url).searchParams;
+  const accountId = params.get("accountId") ?? params.get("provider") ?? "";
+  if (!getAccount(accountId)) return NextResponse.json({ error: "账号不存在" }, { status: 404 });
+  deleteCredential(accountId);
   return NextResponse.json({ ok: true });
 }

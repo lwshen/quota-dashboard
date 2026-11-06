@@ -13,8 +13,8 @@ function formatValue(value: number, unit: string) {
   return `${value.toLocaleString("zh-CN", { maximumFractionDigits: 2 })}${unit === "%" ? "%" : unit ? ` ${unit}` : ""}`;
 }
 
-export function UsageHistoryDialog({ provider, label, authed, onClose }: {
-  provider: string; label: string; authed: boolean; onClose: () => void;
+export function UsageHistoryDialog({ accountId, label, authed, onClose }: {
+  accountId: string; label: string; authed: boolean; onClose: () => void;
 }) {
   const dialog = useModalDialog();
   const [range, setRange] = useState<HistoryRange>("24h");
@@ -33,10 +33,10 @@ export function UsageHistoryDialog({ provider, label, authed, onClose }: {
     setHistory(null);
     async function load() {
       try {
-        const res = await fetch(`/api/history?provider=${encodeURIComponent(provider)}&range=${range}`, {
+        const res = await fetch(`/api/history?accountId=${encodeURIComponent(accountId)}&range=${range}`, {
           cache: "no-store", signal: controller.signal,
         });
-        if (!res.ok) throw new Error(res.status === 404 ? "该渠道已停用，请关闭后重新加载看板。" : "历史数据加载失败，请重试。");
+        if (!res.ok) throw new Error(res.status === 404 ? "该账号不存在或已停用，请关闭后重新加载看板。" : "历史数据加载失败，请重试。");
         const data: UsageHistory = await res.json();
         if (!controller.signal.aborted) setHistory(data);
       } catch (e) {
@@ -47,7 +47,7 @@ export function UsageHistoryDialog({ provider, label, authed, onClose }: {
     }
     void load();
     return () => controller.abort();
-  }, [provider, range, authed, attempt]);
+  }, [accountId, range, authed, attempt]);
 
   useEffect(() => {
     if (!loading && restoreRetryFocus.current) {

@@ -24,8 +24,8 @@ function debugHttpClient(provider: UsageProvider): HttpClient {
 }
 
 // Route handlers and instrumentation may load separate copies of this module.
-const processState = globalThis as typeof globalThis & { quotaUsageFetcher?: ReturnType<typeof createUsageFetcher> };
-export const fetchAndStore = processState.quotaUsageFetcher ??= createUsageFetcher({
+const processState = globalThis as typeof globalThis & { quotaUsageFetcher?: ReturnType<typeof createUsageFetcher<string>> };
+export const fetchAndStore = processState.quotaUsageFetcher ??= createUsageFetcher<string>({
   load: getCredential,
   update: updateCredentialSecret,
   http: debugHttpClient,
@@ -38,5 +38,5 @@ export const fetchAndStore = processState.quotaUsageFetcher ??= createUsageFetch
 
 export async function fetchAllConfigured(): Promise<void> {
   const creds = listCredentials().filter((c) => c.enabled);
-  await Promise.all(creds.map((c) => fetchAndStore(c.provider)));
+  await Promise.all(creds.map((c) => fetchAndStore(c.accountId)));
 }

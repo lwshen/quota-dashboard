@@ -11,6 +11,14 @@ export function db(): Database.Database {
   const d = new Database(ENV.dbPath);
   d.pragma("journal_mode = WAL");
   d.exec(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id         TEXT PRIMARY KEY,
+      provider   TEXT NOT NULL,
+      alias      TEXT NOT NULL,
+      group_name TEXT NOT NULL DEFAULT '',
+      enabled    INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS provider_settings (
       provider   TEXT PRIMARY KEY,
       enabled    INTEGER NOT NULL DEFAULT 1
@@ -42,6 +50,22 @@ export function db(): Database.Database {
       PRIMARY KEY (provider, alert_key)
     );
   `);
+  // Retain legacy storage keys and encrypted bytes; codex2 becomes an ordinary Codex account.
+  d.transaction(() => {
+    d.exec(`INSERT OR IGNORE INTO accounts (id, provider, alias, group_name, enabled, created_at)
+      SELECT legacy.provider, CASE WHEN legacy.provider='codex2' THEN 'codex' ELSE legacy.provider END,
+        CASE legacy.provider WHEN 'codex' THEN 'Codex' WHEN 'codex2' THEN 'Codex #2'
+          WHEN 'claude' THEN 'Claude' WHEN 'grok' THEN 'Grok' WHEN 'kimi' THEN 'Kimi'
+          WHEN 'moonshot' THEN 'Moonshot' ELSE 'RightAPI' END,
+        '', COALESCE(settings.enabled, 1) * COALESCE(creds.enabled, 1),
+        COALESCE(creds.updated_at, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      FROM (SELECT provider FROM credentials UNION SELECT provider FROM provider_settings
+        UNION SELECT provider FROM snapshots UNION SELECT provider FROM snapshot_history
+        UNION SELECT provider FROM notification_alert_state) legacy
+      LEFT JOIN provider_settings settings ON settings.provider=legacy.provider
+      LEFT JOIN credentials creds ON creds.provider=legacy.provider
+      WHERE legacy.provider IN ('codex','codex2','claude','grok','kimi','moonshot','rightapi')`);
+  })();
   _db = d;
   return d;
 }

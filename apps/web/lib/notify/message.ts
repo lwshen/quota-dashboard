@@ -39,9 +39,9 @@ function fmtEta(iso: string, now: Date): string | null {
   return parts.join(" ");
 }
 
-export function buildQuotaResetMessage(events: QuotaResetEvent[], now: Date): NotifyMessage {
+export function buildQuotaResetMessage(events: QuotaResetEvent[], now: Date, accountLabel?: string): NotifyMessage {
   const lines = events.map((e) => {
-    const name = splitLabel(getDescriptor(e.provider).label).name;
+    const name = splitLabel(getDescriptor(e.provider).label).name + (accountLabel ? ` · ${safeText(accountLabel)}` : "");
     const usage = `${Math.round(e.previousUsedPercent)}% → ${Math.round(e.currentUsedPercent)}%`;
     let line = `**${name} · ${laneLabel(e)}** 已重置，新额度可用（用量 ${usage}）`;
     if (e.resetsAt) {
@@ -64,7 +64,7 @@ function safeText(value: string): string {
   return value.replace(/[\r\n]/g, " ").replace(/[<>]/g, "").replace(/[\\*_`\[\]]/g, "\\$&").slice(0, 160);
 }
 
-export function buildAlertMessage(provider: UsageProvider, notices: AlertNotice[], now: Date, dashboardUrl?: string): NotifyMessage {
+export function buildAlertMessage(provider: UsageProvider, notices: AlertNotice[], now: Date, dashboardUrl?: string, accountLabel?: string): NotifyMessage {
   const name = splitLabel(getDescriptor(provider).label).name;
   const number = (value: number) => value.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
   const lines = notices.map((notice) => {
@@ -78,18 +78,18 @@ export function buildAlertMessage(provider: UsageProvider, notices: AlertNotice[
     const last = notice.lastSuccessAt ? `\n最后成功获取：${fmtTime(notice.lastSuccessAt)}` : "\n尚未成功获取用量。";
     if (notice.kind === "credentials") {
       return (notice.refreshRejected ? "凭据自动续期已被永久拒绝。请重新登录并导入完整凭据。"
-        : "用量接口拒绝了当前凭据。请检查 Token 是否有效及账户权限，并在渠道管理中更新凭据。") + last;
+        : "用量接口拒绝了当前凭据。请检查 Token 是否有效及账户权限，并在账号管理中更新凭据。") + last;
     }
     return `连续 ${notice.failures} 次获取用量失败${notice.rateLimited ? "（上游限流）" : ""}。将继续自动重试，请检查网络及上游服务。${last}`;
   });
-  lines.unshift(`**${safeText(name)}**`);
+  lines.unshift(`**${safeText(name)}${accountLabel ? ` · ${safeText(accountLabel)}` : ""}**`);
   if (dashboardUrl) {
     try {
       const url = new URL(dashboardUrl);
       if (["http:", "https:"].includes(url.protocol) && !url.username && !url.password) {
         url.search = "";
         url.hash = "";
-        lines.push(`[打开看板 · 渠道管理](${url.href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`);
+        lines.push(`[打开看板 · 账号管理](${url.href.replace(/\(/g, "%28").replace(/\)/g, "%29")})`);
       }
     } catch { /* Ignore invalid optional links. */ }
   }

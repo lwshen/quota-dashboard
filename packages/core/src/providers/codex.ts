@@ -1,7 +1,6 @@
 // GET usage requires headers: Authorization: Bearer <access_token>, User-Agent, ChatGPT-Account-Id: <account_id>.
 // Window role keyed by windowMinutes: 300=session(primary), 10080=weekly(secondary).
-// Storage is keyed by provider id, so a second ChatGPT account gets its own slot ("codex2")
-// built from the same implementation — see makeCodexDescriptor at the bottom.
+// The legacy codex2 descriptor remains available only for compatibility with older callers.
 
 import type { CredentialField, FetchContext, ProviderCredentials, ProviderDescriptor, ProviderFetchStrategy, RefreshResult } from "../adapter";
 import { RateLimitedError, RefreshRejectedError, UnauthorizedError, UpstreamError } from "../adapter";
@@ -194,7 +193,7 @@ const CREDENTIAL_FIELDS: CredentialField[] = [
   { key: "refreshToken", label: "Refresh Token（可选）", required: false, secret: true },
 ];
 
-/** One descriptor per ChatGPT account; each slot stores its own credential and snapshot. */
+/** The web account registry supplies independent credentials to this shared adapter. */
 function makeCodexDescriptor(provider: UsageProvider, label: string): ProviderDescriptor {
   const strategy = makeCodexOAuthStrategy(provider);
   return {
