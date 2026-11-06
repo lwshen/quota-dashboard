@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Header } from "@/components/Header";
 import { LoginModal } from "@/components/LoginModal";
 import { ProviderCard, type ProviderView } from "@/components/ProviderCard";
 import { ProviderSettings } from "@/components/ProviderSettings";
+
+const UsageHistoryDialog = dynamic(() => import("@/components/UsageHistoryDialog").then((module) => module.UsageHistoryDialog));
 
 export default function Home() {
   const [views, setViews] = useState<ProviderView[]>([]);
@@ -16,6 +19,7 @@ export default function Home() {
   const [showProviderSettings, setShowProviderSettings] = useState(false);
   const [managedProvider, setManagedProvider] = useState<string | undefined>();
   const [refreshing, setRefreshing] = useState(false);
+  const [historyProvider, setHistoryProvider] = useState<string | null>(null);
 
   const loadUsage = useCallback(async () => {
     try {
@@ -73,6 +77,7 @@ export default function Home() {
     } finally {
       setAuthed(false);
       setShowProviderSettings(false);
+      setHistoryProvider(null);
       // Re-fetch so account identity (balance / email) drops from the public view.
       loadUsage();
     }
@@ -82,6 +87,8 @@ export default function Home() {
     setShowLogin(false);
     await Promise.all([loadSession(), loadUsage()]);
   }
+
+  const selectedHistoryProvider = views.find((view) => view.provider === historyProvider);
 
   return (
     <div className="app">
@@ -109,12 +116,19 @@ export default function Home() {
               now={now}
               authed={authed}
               onConfigure={authed ? openManagement : undefined}
+              onHistory={setHistoryProvider}
             />
           ))}
         </div>
       </div>
 
       {showLogin && <LoginModal onClose={() => setShowLogin(false)} onSuccess={onLoginSuccess} />}
+
+      {selectedHistoryProvider && (
+        <UsageHistoryDialog key={selectedHistoryProvider.provider} provider={selectedHistoryProvider.provider}
+          label={selectedHistoryProvider.label}
+          authed={authed} onClose={() => setHistoryProvider(null)} />
+      )}
 
       {authed && showProviderSettings && (
         <ProviderSettings initialProvider={managedProvider} onClose={() => setShowProviderSettings(false)} onChanged={loadUsage} />

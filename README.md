@@ -123,6 +123,14 @@ Disabled providers offer Save credentials without fetching, followed by **启用
 
 To inspect a provider response while debugging, set `DEBUG=true`. Raw quota API response bodies are written to the **server console** during each fetch and are never returned by the dashboard API. Do not enable this in production, because responses may contain account data.
 
+## Usage history
+
+Choose **历史曲线** (History) on a provider card to view the past 24 hours, 7 days, or 30 days. Select a quota window to see its latest recorded value, minimum, and maximum. Markers identify detected quota resets. Hover over the chart, or focus it and use the arrow keys, to inspect sample times and values. Times use the browser's local timezone.
+
+Charts read existing `snapshot_history` records without reconfiguring credentials. Unknown usage, missing windows, and long collection gaps break the line; different model identities and window durations stay separate. Longer ranges retain endpoints, minima, maxima, and reset points in time buckets instead of sending every raw snapshot to the browser. A single observation appears as a point; ranges without usable observations show an empty state.
+
+Balances and period spend are visible to administrators only, in each provider's original unit, including Credits and legacy Moonshot / RightAPI balance snapshots. Anonymous visitors can view quota percentages. `GET /api/history?provider=codex&range=24h` accepts `24h`, `7d`, or `30d`, excludes account identity and raw upstream responses, and rejects disabled providers.
+
 ## Quota-reset notifications
 
 The poller can push a message when a rate window gets fresh quota — e.g. a 5-hour window that had hit 100% rolls over, or the weekly window resets. Detection compares consecutive snapshots server-side (a sharp used% drop on the same window), so it works for every provider that reports rate windows.
@@ -190,5 +198,5 @@ No UI or backend changes are needed — form fields and card rendering are drive
 ## Notes / trade-offs
 
 - Storage uses **better-sqlite3 directly + hand-written SQL** (minimal dependencies, no migration tooling); if you need typed queries / migrations you can layer on Drizzle.
-- Historical snapshots are already persisted to the `snapshot_history` table (`historyFor` in `store.ts`), which you can use to add a used-% history chart.
+- Historical snapshots are persisted to `snapshot_history`; reset notifications use recent snapshots, while history charts stream a time range and retain key samples.
 - The cookie-scraping paths (claude.ai / chatgpt.com web, Kimi web) are not included in this scaffold — see the upstream report; they are the most fragile and most ToS-sensitive tier, add them as needed.

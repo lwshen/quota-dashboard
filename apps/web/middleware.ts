@@ -27,7 +27,7 @@ function clientIp(req: NextRequest): string {
 // Public read surface (no auth): the read-only dashboard view, the endpoints that
 // power it, and the auth flow. Everything else is an admin / mutating operation and
 // requires a valid session (default-deny). Rate limiting still applies to all paths.
-const PUBLIC_GET = new Set(["/", "/login", "/api/usage", "/api/providers", "/api/session"]);
+const PUBLIC_GET = new Set(["/", "/login", "/api/usage", "/api/history", "/api/providers", "/api/session"]);
 const PUBLIC_POST = new Set(["/api/login", "/api/logout"]);
 
 function isPublic(pathname: string, method: string): boolean {
