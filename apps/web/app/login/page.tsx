@@ -2,7 +2,7 @@
 
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BrandMark } from "@/components/BrandMark";
+import { BrandMark } from "@/components/layout/BrandMark";
 
 export default function LoginPage() {
   const [password, setPassword] = useState("");

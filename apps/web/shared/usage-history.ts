@@ -1,5 +1,5 @@
 import { detectQuotaResets, type RateWindow, type UsageProvider, type UsageSnapshot } from "@quota/core";
-import { laneMeta } from "./format";
+import { laneMeta } from "@/shared/format";
 
 export const HISTORY_RANGES = { "24h": 24 * 60 * 60_000, "7d": 7 * 24 * 60 * 60_000, "30d": 30 * 24 * 60 * 60_000 } as const;
 export type HistoryRange = keyof typeof HISTORY_RANGES;

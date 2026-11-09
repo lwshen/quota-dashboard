@@ -1,40 +1,23 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync, mkdtempSync, rmSync } = require("node:fs");
-const { createRequire } = require("node:module");
-const { join, dirname } = require("node:path");
+const { mkdtempSync, rmSync } = require("node:fs");
+const { join } = require("node:path");
 const { tmpdir } = require("node:os");
-const webRequire = createRequire(join(__dirname, "../package.json"));
-const ts = webRequire("typescript");
+const { createWebLoader, webRequire } = require("./helpers/load-web.cjs");
 const core = require(join(process.env.QUOTA_TEST_BUILD_DIR, "index.js"));
 
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "quota-history-"));
   const env = { dbPath: join(directory, "test.sqlite"), encKey: "00".repeat(32), authDisabled: false, pollInterval: 300 };
-  const modules = new Map();
   let authed = false;
-  function load(relative) {
-    if (modules.has(relative)) return modules.get(relative);
-    const filename = join(__dirname, "..", relative);
-    const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-      fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-    });
-    const module = { exports: {} };
-    const require = (name) => {
-      if (name === "@quota/core") return core;
-      if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
-      if (name === "@/lib/auth" || name === "./lib/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (token) => token === "valid" };
-      if (name === "@/lib/env" || name === "./env" || name === "./lib/env") return { ENV: env };
-      if (name.startsWith("@/")) return load(`${name.slice(2)}.ts`);
-      if (name.startsWith("./")) return load(join(dirname(relative), `${name.slice(2)}.ts`));
-      return webRequire(name);
-    };
-    new Function("require", "module", "exports", outputText)(require, module, module.exports);
-    modules.set(relative, module.exports);
-    return module.exports;
-  }
+  const { load, modules } = createWebLoader((name) => {
+    if (name === "@quota/core") return core;
+    if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
+    if (name === "@/runtime/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (token) => token === "valid" };
+    if (name === "@/runtime/env") return { ENV: env };
+  });
   return { load, set authed(value) { authed = value; }, close() {
-    modules.get("lib/db.ts")?.db().close();
+    modules.get("server/storage/db.ts")?.db().close();
     rmSync(directory, { recursive: true, force: true });
   } };
 }
@@ -51,7 +34,7 @@ function entry(time, used, overrides = {}) {
 test("history leaves unknown values and collection gaps blank, never treating placeholders as zero", () => {
   const f = fixture();
   try {
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     const data = buildUsageHistory("codex", [
       entry(now - 40 * 60_000, 60),
       entry(now - 35 * 60_000, 0, { primary: { usedPercent: 0, usageKnown: false } }),
@@ -72,7 +55,7 @@ test("history leaves unknown values and collection gaps blank, never treating pl
 test("history marks resets without joining different window durations or model identities", () => {
   const f = fixture();
   try {
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     const entries = [entry(now - 600_000, 95), entry(now - 300_000, 4),
       entry(now, 2, { primary: { usedPercent: 2, usageKnown: true, windowMinutes: 10080 } })];
     const data = buildUsageHistory("codex", entries, options);
@@ -92,7 +75,7 @@ test("history marks resets without joining different window durations or model i
 test("long ranges have bounded chart payloads while retaining short-lived usage peaks", () => {
   const f = fixture();
   try {
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     const entries = Array.from({ length: 20_000 }, (_, i) => entry(now - 86_400_000 + i * 4000, i === 10_001 ? 99 : 25));
     const data = buildUsageHistory("codex", entries, options);
     const series = data.series[0];
@@ -107,7 +90,7 @@ test("long ranges have bounded chart payloads while retaining short-lived usage 
 test("sampling cannot reconnect multiple unknown intervals in the same bucket", () => {
   const f = fixture();
   try {
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     const base = now - 120_000;
     const values = [10, null, 20, null, 90, null, 30];
     const data = buildUsageHistory("codex", values.map((value, i) => entry(base + i * 1000, value ?? 0, {
@@ -124,7 +107,7 @@ test("sampling cannot reconnect multiple unknown intervals in the same bucket", 
 test("legacy Moonshot and RightAPI balances retain their display unit and stay admin-only", () => {
   const f = fixture();
   try {
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     for (const [provider, label, value, unit] of [
       ["moonshot", "Balance: ¥42.50", 42.5, "¥"], ["rightapi", "Balance: $-3.25 · 待入账 $1.00", -3.25, "$"],
     ]) {
@@ -140,7 +123,7 @@ test("legacy Moonshot and RightAPI balances retain their display unit and stay a
 test("history API enforces range bounds, public privacy, admin costs, and disabled providers", async () => {
   const f = fixture();
   try {
-    const store = f.load("lib/store.ts");
+    const store = f.load("server/storage/index.ts");
     const route = f.load("app/api/history/route.ts");
     const stamp = Date.now() - 60_000;
     const sample = entry(stamp, 42, {
@@ -177,13 +160,13 @@ test("history API enforces range bounds, public privacy, admin costs, and disabl
 test("indexed history query uses timestamp order, includes boundaries, and separates providers", () => {
   const f = fixture();
   try {
-    const store = f.load("lib/store.ts");
+    const store = f.load("server/storage/index.ts");
     const samples = [entry(now - 60_000, 30), entry(now - 180_000, 10), entry(now - 120_000, 20)];
     for (const sample of samples) store.saveSnapshot("codex", sample.snapshot, null, new Date(sample.fetchedAt));
     store.saveSnapshot("kimi", { ...samples[0].snapshot, provider: "kimi" }, null, new Date(samples[0].fetchedAt));
     const results = [...store.historyInRange("codex", new Date(now - 180_000), new Date(now - 60_000))];
     assert.deepEqual(results.map((sample) => sample.snapshot.primary.usedPercent), [10, 20, 30]);
-    const { buildUsageHistory } = f.load("lib/usage-history.ts");
+    const { buildUsageHistory } = f.load("shared/usage-history.ts");
     const outOfRange = buildUsageHistory("codex", [entry(now - 86_400_001, 50), entry(now + 1, 80)], options);
     assert.equal(outOfRange.sampleCount, 0);
     assert.deepEqual(outOfRange.series, []);

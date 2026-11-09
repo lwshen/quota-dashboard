@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getDescriptor } from "@quota/core";
-import { listAccounts, listSnapshots } from "@/lib/store";
-import { ENV } from "@/lib/env";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth";
+import { listAccounts, listSnapshots } from "@/server/storage";
+import { ENV } from "@/runtime/env";
+import { SESSION_COOKIE, verifySessionToken } from "@/runtime/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

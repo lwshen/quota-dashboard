@@ -1,4 +1,4 @@
-// SSRF: literal-level checks only; DNS-resolution checks live in apps/web/lib/ssrf.ts
+// SSRF: literal-level checks only; DNS-resolution checks live in apps/web/server/security/ssrf.ts
 // to stop public domains resolving to private addresses.
 
 export function isPrivateIpLiteral(host: string): boolean {

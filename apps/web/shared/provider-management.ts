@@ -1,11 +1,6 @@
-export interface CredentialFieldMeta {
-  key: string;
-  label: string;
-  required: boolean;
-  secret: boolean;
-  placeholder?: string;
-  help?: string;
-}
+import type { CredentialField, UsageProvider } from "@quota/core";
+
+export type CredentialFieldMeta = CredentialField;
 
 export interface ProviderMeta {
   provider: string;
@@ -25,7 +20,7 @@ export interface CredentialMeta {
 
 export interface AccountMeta {
   id: string;
-  provider: string;
+  provider: UsageProvider;
   alias: string;
   groupName: string;
   enabled: boolean;

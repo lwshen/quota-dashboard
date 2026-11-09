@@ -25,19 +25,22 @@ api.anthropic.com · chatgpt.com/backend-api · api.kimi.com · ...
 
 ```
 quota-dashboard/
-├─ packages/core/          # Provider-agnostic core (independently testable)
-│  └─ src/
-│     ├─ model.ts          # Unified models: RateWindow / UsageSnapshot, etc.
-│     ├─ adapter.ts        # ProviderFetchStrategy / runPipeline pipeline
-│     ├─ decode.ts         # Fault-tolerant decode helpers
-│     ├─ http.ts           # HttpClient abstraction + Node fetch implementation
-│     ├─ registry.ts       # Provider registry
-│     └─ providers/        # kimi / moonshot / claude / codex / grok / rightapi
-└─ apps/web/               # Next.js dashboard + backend proxy
-   ├─ app/                 # Pages + API routes
-   ├─ components/          # ProviderCard / RateWindowBar / forms
-   └─ lib/                 # db / crypto / store / fetcher / poller
+├─ packages/core/          # Framework-free models, providers, OAuth and HTTP
+│  ├─ src/providers/       # kimi / moonshot / claude / codex / grok / rightapi
+│  └─ tests/               # Offline protocol and fetch tests
+├─ apps/web/
+│  ├─ app/                 # Pages and API routes
+│  ├─ components/          # accounts / auth / dashboard / layout features
+│  ├─ client/              # Browser interaction hooks
+│  ├─ shared/              # Pure logic, formatting, API types and JSON import
+│  ├─ runtime/             # Edge / Node configuration and session auth
+│  ├─ server/              # credentials / security / storage / usage / notify
+│  └─ tests/               # API, SQLite, notification and rendering tests
+├─ scripts/                # Environment setup, tests and dependency checks
+└─ docs/                   # Architecture guide and feature screenshots
 ```
+
+See the [architecture and maintenance guide (Chinese)](./docs/architecture.zh-CN.md) for module boundaries and change locations.
 
 ## Implemented providers
 
@@ -157,7 +160,7 @@ NOTIFY_MIN_USED_PERCENT=80   # only notify windows that had reached this used%; 
 
 When channels are configured, a one-shot startup message is also sent as the service boots (useful as a restart/liveness signal).
 
-Reset times in messages use the server timezone — set `TZ` (e.g. `TZ=Asia/Shanghai`) in your deployment. Other channels (Telegram, Slack, ...) can be added by implementing the `NotifyChannel` interface in `apps/web/lib/notify/` and registering it in `notify/index.ts`.
+Reset times in messages use the server timezone — set `TZ` (e.g. `TZ=Asia/Shanghai`) in your deployment. Other channels (Telegram, Slack, ...) can be added by implementing the `NotifyChannel` interface in `apps/web/server/notify/` and registering it in `notify/index.ts`.
 
 ## Low-quota and provider-health alerts
 

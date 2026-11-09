@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { parseGrokAuthFile, type GrokAuthImport } from "@quota/core/grok-auth";
-import { credentialStatus, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/lib/provider-management";
-import { CredentialJsonImport } from "./CredentialJsonImport";
+import { credentialStatus, type CredentialFieldMeta, type CredentialMeta, type ProviderMeta } from "@/shared/provider-management";
+import { CredentialJsonImport } from "@/components/accounts/CredentialJsonImport";
 
 export function AddCredentialForm({ provider, accountId, credential, onBusyChange, onSaved }: {
   provider: ProviderMeta;

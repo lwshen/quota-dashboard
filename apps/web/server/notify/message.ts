@@ -1,8 +1,8 @@
 import type { QuotaResetEvent, UsageProvider } from "@quota/core";
 import { getDescriptor } from "@quota/core";
-import { laneMeta, splitLabel } from "../format";
-import type { NotifyMessage } from "./types";
-import type { AlertNotice } from "./alerts";
+import { laneMeta, splitLabel } from "@/shared/format";
+import type { NotifyMessage } from "@/server/notify/types";
+import type { AlertNotice } from "@/server/notify/alerts";
 
 function laneLabel(e: QuotaResetEvent): string {
   if (e.laneTitle) return e.laneTitle;

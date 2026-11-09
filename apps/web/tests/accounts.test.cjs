@@ -1,11 +1,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync, mkdtempSync, rmSync } = require("node:fs");
-const { createRequire } = require("node:module");
-const { join, dirname } = require("node:path");
+const { mkdtempSync, rmSync } = require("node:fs");
+const { join } = require("node:path");
 const { tmpdir } = require("node:os");
-const webRequire = createRequire(join(__dirname, "../package.json"));
-const ts = webRequire("typescript");
+const { createWebLoader, webRequire } = require("./helpers/load-web.cjs");
 const core = require(join(process.env.QUOTA_TEST_BUILD_DIR, "index.js"));
 const Database = webRequire("better-sqlite3");
 
@@ -15,7 +13,7 @@ function fixture() {
     dashboardPassword: "test", notifyAlertsEnabled: true, feishuWebhookUrl: "https://synthetic.invalid",
     notifyUsageThresholds: [80, 95], notifyBalanceThresholds: {}, notifyFailureThreshold: 3,
     notifyCooldownSeconds: 21600, notifyStaleSeconds: 1800, notifyRecovery: true, notifyMinUsedPercent: 80 };
-  const modules = new Map(), calls = [], messages = [];
+  const calls = [], messages = [];
   let authed = true;
   let safetyCheck = async () => {};
   let upstream = async (_url, headers) => ({ status: 200, headers: {}, body: JSON.stringify({
@@ -23,38 +21,21 @@ function fixture() {
     credits: { has_credits: true, balance: 42 },
   }) });
   class FakeChannel { name = "feishu"; async send(message) { messages.push(message); } }
-  function load(relative) {
-    if (modules.has(relative)) return modules.get(relative);
-    const filename = join(__dirname, "..", relative);
-    const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-      fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-    });
-    const module = { exports: {} };
-    const require = (name) => {
-      if (name === "@quota/core") return { ...core, nodeHttpClient: { get: async (...args) => { calls.push(args); return upstream(...args); } } };
-      if (name === "@quota/core/grok-auth") return requireCore("providers/grok-auth.js");
-      if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
-      if (name === "@/lib/auth" || name === "./lib/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (value) => value === "valid" };
-      if (["@/lib/env", "./env", "../env", "./lib/env"].includes(name)) return { ENV: env };
-      if (name === "./feishu") return { FeishuChannel: FakeChannel };
-      if (name === "@/lib/ssrf") return { assertSafeBaseUrl: (...args) => safetyCheck(...args) };
-      if (name === "./notify") return load("lib/notify/index.ts");
-      if (name.startsWith("@/")) return load(`${name.slice(2)}.ts`);
-      if (name.startsWith(".")) return load(join(dirname(relative), `${name}.ts`));
-      return webRequire(name);
-    };
-    new Function("require", "module", "exports", outputText)(require, module, module.exports);
-    modules.set(relative, module.exports);
-    return module.exports;
-  }
-  const requireCore = (path) => require(join(process.env.QUOTA_TEST_BUILD_DIR, path));
+  const { load, modules } = createWebLoader((name) => {
+    if (name === "@quota/core") return { ...core, nodeHttpClient: { get: async (...args) => { calls.push(args); return upstream(...args); } } };
+    if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
+    if (name === "@/runtime/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (value) => value === "valid" };
+    if (name === "@/runtime/env") return { ENV: env };
+    if (name === "@/server/notify/feishu") return { FeishuChannel: FakeChannel };
+    if (name === "@/server/security/ssrf") return { assertSafeBaseUrl: (...args) => safetyCheck(...args) };
+  });
   const oldFetcher = globalThis.quotaUsageFetcher;
   delete globalThis.quotaUsageFetcher;
-  return { load, modules, env, calls, messages, get store() { return load("lib/store.ts"); },
+  return { load, modules, env, calls, messages, get store() { return load("server/storage/index.ts"); },
     set authed(value) { authed = value; }, set upstream(value) { upstream = value; },
     set safetyCheck(value) { safetyCheck = value; },
     close() {
-      modules.get("lib/db.ts")?.db().close();
+      modules.get("server/storage/db.ts")?.db().close();
       if (oldFetcher) globalThis.quotaUsageFetcher = oldFetcher;
       else delete globalThis.quotaUsageFetcher;
       rmSync(directory, { recursive: true, force: true });
@@ -68,7 +49,7 @@ const request = (method, body, path = "accounts") => new Request(`http://localho
 test("legacy Codex slots migrate without decrypting or rewriting credentials, history, switches, or notification state", () => {
   const f = fixture();
   try {
-    const ciphertext = f.load("lib/crypto.ts").encrypt(JSON.stringify({ bearerToken: "legacy-secret", refreshToken: "legacy-refresh" }));
+    const ciphertext = f.load("server/security/crypto.ts").encrypt(JSON.stringify({ bearerToken: "legacy-secret", refreshToken: "legacy-refresh" }));
     const old = new Database(f.env.dbPath);
     old.exec(`CREATE TABLE credentials (provider TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1, mode TEXT NOT NULL, data TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE TABLE provider_settings (provider TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 1);
@@ -90,20 +71,20 @@ test("legacy Codex slots migrate without decrypting or rewriting credentials, hi
     assert.equal(f.store.getCredential("codex2").enabled, false);
     assert.equal(f.store.getCredential("codex2").provider, "codex");
     assert.equal(f.store.getCredential("codex2").credentials.bearerToken, "legacy-secret");
-    assert.equal(f.load("lib/db.ts").db().prepare("SELECT data FROM credentials WHERE provider='codex2'").get().data, ciphertext);
+    assert.equal(f.load("server/storage/db.ts").db().prepare("SELECT data FROM credentials WHERE provider='codex2'").get().data, ciphertext);
     assert.equal(f.store.historyFor("codex2")[0].snapshot.provider, "codex");
     assert.equal(f.store.listSnapshots().find((row) => row.provider === "codex2").snapshot.primary.usedPercent, 95);
     assert.equal(f.store.getAlertState("codex2", "health").level, 2);
     f.store.updateAccount("codex2", { alias: "个人账号", groupName: "个人", enabled: true });
-    f.load("lib/db.ts").db().close();
-    f.modules.delete("lib/db.ts"); f.modules.delete("lib/store.ts");
+    f.load("server/storage/db.ts").db().close();
+    f.modules.clear();
     assert.equal(f.store.listAccounts().length, 2, "migration is idempotent");
     assert.equal(f.store.getAccount("codex2").alias, "个人账号");
     assert.equal(f.store.getCredential("codex2").enabled, true);
     assert.equal(f.store.historyFor("codex2").length, 1);
     f.store.deleteAccount("codex2");
-    f.load("lib/db.ts").db().close();
-    f.modules.delete("lib/db.ts"); f.modules.delete("lib/store.ts");
+    f.load("server/storage/db.ts").db().close();
+    f.modules.clear();
     assert.equal(f.store.getAccount("codex2"), null, "deleted legacy accounts do not reappear after restart");
     assert.equal(f.store.getCredential("codex").credentials.bearerToken, "legacy-secret");
   } finally { f.close(); }
@@ -192,7 +173,7 @@ test("credentials, target refresh, polling, dashboard and history stay isolated 
     assert.equal((await history.GET(new Request(`http://localhost/api/history?accountId=${work.id}`))).status, 404);
     assert.equal((await refresh.POST(request("POST", { accountId: work.id }, "refresh"))).status, 409);
     const before = f.calls.length;
-    await f.load("lib/fetcher.ts").fetchAllConfigured();
+    await f.load("server/usage/fetcher.ts").fetchAllConfigured();
     assert.equal(f.calls.length, before + 1);
     assert.equal(f.calls.at(-1)[1].Authorization, "Bearer personal-secret");
     assert.equal(f.store.getCredential(work.id).credentials.bearerToken, "work-secret");
@@ -221,7 +202,7 @@ test("reset reminders and warning cooldowns do not suppress a second account of 
   const f = fixture();
   try {
     const accounts = [f.store.createAccount("codex", "工作", "团队"), f.store.createAccount("codex", "个人", "个人")];
-    const notify = f.load("lib/notify/index.ts");
+    const notify = f.load("server/notify/index.ts");
     for (const account of accounts) {
       f.store.saveCredential(account.id, "oauth", { bearerToken: "synthetic" }, stamp);
       const now = new Date();

@@ -1,7 +1,7 @@
 // Ciphertext format: base64(iv).base64(authTag).base64(ciphertext)
 
 import crypto from "node:crypto";
-import { ENV } from "./env";
+import { ENV } from "@/runtime/env";
 
 function key(): Buffer {
   const raw = ENV.encKey.trim();

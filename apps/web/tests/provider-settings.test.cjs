@@ -1,45 +1,26 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync, mkdtempSync, rmSync } = require("node:fs");
-const { createRequire } = require("node:module");
+const { mkdtempSync, rmSync } = require("node:fs");
 const { join } = require("node:path");
 const { tmpdir } = require("node:os");
-const webRequire = createRequire(join(__dirname, "../package.json"));
-const ts = webRequire("typescript");
+const { createWebLoader, webRequire } = require("./helpers/load-web.cjs");
 const core = require(join(process.env.QUOTA_TEST_BUILD_DIR, "index.js"));
-const requireCoreAuth = () => require(join(process.env.QUOTA_TEST_BUILD_DIR, "providers/grok-auth.js"));
 
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "quota-settings-"));
   const env = { dbPath: join(directory, "test.sqlite"), encKey: "00".repeat(32), authDisabled: false, dashboardPassword: "test" };
-  const modules = new Map();
   let authed = false;
   let networkCalls = 0;
   let safetyCheck = async () => {};
   const http = { get: async () => { networkCalls++; return { status: 500, body: "synthetic failure", headers: {} }; } };
-  function load(relative) {
-    if (modules.has(relative)) return modules.get(relative);
-    const filename = join(__dirname, "..", relative);
-    const { outputText } = ts.transpileModule(readFileSync(filename, "utf8"), {
-      fileName: filename, compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-    });
-    const module = { exports: {} };
-    const require = (name) => {
-      if (name === "@quota/core/grok-auth") return requireCoreAuth();
-      if (name === "@/lib/ssrf") return { assertSafeBaseUrl: async () => safetyCheck() };
-      if (name === "@quota/core") return { ...core, nodeHttpClient: http };
-      if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
-      if (name === "@/lib/auth" || name === "./lib/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (token) => token === "valid" };
-      if (name === "@/lib/env" || name === "./env" || name === "./lib/env") return { ENV: env };
-      if (name === "./notify") return { detectAndNotifyResets() {}, detectAndNotifyAlerts() {} };
-      if (name.startsWith("@/")) return load(`${name.slice(2)}.ts`);
-      if (name.startsWith(".")) return load(join(relative.slice(0, relative.lastIndexOf("/")), `${name}.ts`));
-      return webRequire(name);
-    };
-    new Function("require", "module", "exports", outputText)(require, module, module.exports);
-    modules.set(relative, module.exports);
-    return module.exports;
-  }
+  const { load, modules } = createWebLoader((name) => {
+    if (name === "@/server/security/ssrf") return { assertSafeBaseUrl: async () => safetyCheck() };
+    if (name === "@quota/core") return { ...core, nodeHttpClient: http };
+    if (name === "next/headers") return { cookies: async () => ({ get: () => ({ value: authed ? "valid" : "" }) }) };
+    if (name === "@/runtime/auth") return { SESSION_COOKIE: "session", verifySessionToken: async (token) => token === "valid" };
+    if (name === "@/runtime/env") return { ENV: env };
+    if (name === "@/server/notify") return { detectAndNotifyResets() {}, detectAndNotifyAlerts() {} };
+  });
   const oldFetcher = globalThis.quotaUsageFetcher;
   delete globalThis.quotaUsageFetcher;
   return {
@@ -47,7 +28,7 @@ function fixture() {
     set authed(value) { authed = value; },
     set safetyCheck(value) { safetyCheck = value; },
     close() {
-      load("lib/db.ts").db().close();
+      load("server/storage/db.ts").db().close();
       if (oldFetcher) globalThis.quotaUsageFetcher = oldFetcher;
       else delete globalThis.quotaUsageFetcher;
       rmSync(directory, { recursive: true, force: true });
@@ -57,7 +38,7 @@ function fixture() {
 
 test("provider switches persist, hide public cards, and prevent scheduled and direct usage requests", async (t) => {
   const f = fixture();
-  const store = f.load("lib/store.ts");
+  const store = f.load("server/storage/index.ts");
   const providers = f.load("app/api/providers/route.ts");
   const usage = f.load("app/api/usage/route.ts");
   const request = (body) => new Request("http://localhost/api/providers", { method: "PATCH", body: JSON.stringify(body) });
@@ -88,7 +69,7 @@ test("provider switches persist, hide public cards, and prevent scheduled and di
       assert.equal(store.getCredential("rightapi").credentials.bearerToken, "replacement");
     });
     await t.test("background/manual batch skips disabled providers; re-enabling restores fetching", async () => {
-      const fetcher = f.load("lib/fetcher.ts");
+      const fetcher = f.load("server/usage/fetcher.ts");
       await fetcher.fetchAllConfigured();
       await fetcher.fetchAndStore("rightapi");
       assert.equal(f.networkCalls, 0);
@@ -103,10 +84,9 @@ test("provider switches persist, hide public cards, and prevent scheduled and di
       assert.equal(store.listSnapshots().length, 1);
     });
     await t.test("a fresh database connection retains the disabled setting", () => {
-      f.load("lib/db.ts").db().close();
-      f.modules.delete("lib/db.ts");
-      f.modules.delete("lib/store.ts");
-      const reopened = f.load("lib/store.ts");
+      f.load("server/storage/db.ts").db().close();
+      f.modules.clear();
+      const reopened = f.load("server/storage/index.ts");
       assert.equal(reopened.listProviderSettings().get("rightapi"), false);
       assert.equal(reopened.getCredential("rightapi").enabled, false);
       assert.equal(reopened.getCredential("rightapi").credentials.bearerToken, "replacement");
@@ -124,7 +104,7 @@ test("provider switches persist, hide public cards, and prevent scheduled and di
 
 test("credential editing preserves same-account values, requires explicit replacement, and does not expose secrets", async (t) => {
   const f = fixture();
-  const store = f.load("lib/store.ts");
+  const store = f.load("server/storage/index.ts");
   const route = f.load("app/api/credentials/route.ts");
   const request = (body) => new Request("http://localhost/api/credentials", { method: "POST", body: JSON.stringify(body) });
   const now = new Date();
@@ -226,9 +206,9 @@ test("credential editing preserves same-account values, requires explicit replac
 test("imported Codex and Claude credentials save through the existing API without retaining old optional tokens", async () => {
   const f = fixture();
   try {
-    const store = f.load("lib/store.ts");
+    const store = f.load("server/storage/index.ts");
     const route = f.load("app/api/credentials/route.ts");
-    const { parseCredentialJson } = f.load("lib/credential-import.ts");
+    const { parseCredentialJson } = f.load("shared/credential-import.ts");
     for (const provider of ["codex", "codex2", "claude"]) {
       store.setProviderEnabled(provider, false);
       store.saveCredential(provider, "auto", { bearerToken: "previous-access", refreshToken: "previous-refresh", accountId: "previous-account" }, new Date());

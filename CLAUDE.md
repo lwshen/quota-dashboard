@@ -13,10 +13,11 @@ pnpm dev                # next dev for @quota/web → http://localhost:3000
 pnpm build              # next build (standalone output)
 pnpm start              # run the standalone production server
 pnpm typecheck          # tsc --noEmit across all packages (pnpm -r typecheck)
-pnpm test               # offline core provider and HTTP transport tests (Node test runner)
+pnpm test               # offline Core + Web regression tests (Node test runner)
+pnpm check:boundaries   # verify browser / Edge / server dependency boundaries
 ```
 
-Core tests live in `packages/core/tests/*.test.cjs`. `pnpm test` compiles core to a temporary directory and runs Node's built-in test runner; no live credentials are needed. There is no linter/formatter configured. Run `pnpm typecheck` and relevant tests for provider changes.
+Tests live in `packages/core/tests/*.test.cjs` and `apps/web/tests/*.test.cjs`. `pnpm test` compiles core to a temporary directory and runs both suites with Node's built-in test runner; no live credentials are needed. Web fixtures share `apps/web/tests/helpers/load-web.cjs` and isolate their module caches and mocks. There is no linter/formatter configured. TypeScript rejects unused locals and parameters; CI also checks module boundaries. Run `pnpm typecheck` and relevant tests for provider changes.
 
 Before running locally, run `pnpm setup:env` (`scripts/setup-env.mjs`): it copies `apps/web/.env.example` → `apps/web/.env`, generates `APP_ENC_KEY` / `AUTH_SECRET` / `DASHBOARD_PASSWORD`, and sets `AUTH_DISABLED=true` so login is skipped. It never overwrites an existing `.env` unless given `--force` (which first writes a `.env.bak`). To do it by hand instead: copy the example and set `APP_ENC_KEY` (`openssl rand -hex 32`).
 
@@ -26,6 +27,14 @@ A pnpm-workspace monorepo with two packages:
 
 - **`packages/core`** (`@quota/core`) — provider-agnostic, framework-free TypeScript. Consumed **directly from `src/` TypeScript source** (no build step): `apps/web` lists it in `transpilePackages`, so Next.js compiles it. Don't add a build/`dist` step for core.
 - **`apps/web`** (`@quota/web`) — Next.js 15 App Router app **plus** the backend proxy (route handlers run in the Node runtime).
+
+### Web module boundaries
+
+- `components/` groups account, auth, dashboard and layout UI; `client/` holds browser hooks.
+- `shared/` contains pure formatting, history processing, credential JSON parsing and API metadata types; it cannot depend on application runtime modules.
+- `runtime/` contains Edge-compatible environment and session code. It is used by middleware and Node routes, never imported into browser code.
+- `server/` groups credentials, security, storage, usage collection and notifications. `server/storage/index.ts` exposes focused account, credential, snapshot and alert-state modules; storage internals import concrete files rather than the barrel.
+- Keep pages and route handlers as application entry points. Preserve the existing provider pipeline and storage contracts. See [the architecture guide](docs/architecture.zh-CN.md) for the full layout and maintenance map.
 
 ### Why a backend exists (the central design constraint)
 
@@ -48,23 +57,23 @@ UI and backend use provider descriptor metadata. The account registry stores ind
 - `middleware.ts` gates **all** pages and `/api/*` (auth + per-IP rate limit) before anything else runs.
 - `GET/POST/PATCH/DELETE /api/accounts` → administrator-only account CRUD; provider is immutable, alias/group changes preserve credentials and history.
 - `POST /api/credentials` → validates fields per descriptor, SSRF-checks any `baseUrlOverride`, encrypts and stores the credential, then fetches once immediately.
-- `lib/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `lib/store.ts`. Requests and in-flight work are keyed by dashboard account ID; provider adapters are selected from the credential record's provider.
-- `lib/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
+- `server/usage/fetcher.ts` (`fetchAndStore`) → loads decrypted creds, runs `runPipeline`, handles OAuth token refresh, persists the snapshot via `server/storage/index.ts`. Requests and in-flight work are keyed by dashboard account ID; provider adapters are selected from the credential record's provider.
+- `server/usage/poller.ts` (`startPoller`) → background loop every `POLL_INTERVAL_SECONDS`. Started by `instrumentation.ts` **only when `NEXT_RUNTIME === "nodejs"`** (not in the edge runtime).
 - `GET /api/usage` → returns stored snapshots with UI-safe fields only (raw upstream `extra` is stripped).
-- `lib/notify/` → quota-reset, low-quota, credential/fetch-failure, stale-data, and recovery notifications. `fetchAndStore` invokes detection **before** `saveSnapshot`; fetch issues are typed in core, never classified by matching raw error strings. `notify/alerts.ts` groups warnings and persists per-channel cooldowns/delivery reservations in `notification_alert_state`. The poller also checks stale data. Channels implement `NotifyChannel` and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
+- `server/notify/` → quota-reset, low-quota, credential/fetch-failure, stale-data, and recovery notifications. `fetchAndStore` invokes detection **before** `saveSnapshot`; fetch issues are typed in core, never classified by matching raw error strings. `notify/alerts.ts` groups warnings and persists per-channel cooldowns/delivery reservations in `notification_alert_state`. The poller also checks stale data. Channels implement `NotifyChannel` and are registered in `notify/index.ts` — Feishu webhook is the only built-in. `POST /api/notify/test` sends a test message.
 
 ## Conventions & gotchas
 
-- **`lib/auth.ts` runs in both the edge (middleware) and Node (route) runtimes**, so it uses only Web Crypto / `btoa` / `TextEncoder` — do not introduce Node-only APIs there. Sessions are stateless: an expiry signed with HMAC-SHA256 in an httpOnly cookie.
+- **`runtime/auth.ts` runs in both the edge (middleware) and Node (route) runtimes**, so it uses only Web Crypto / `btoa` / `TextEncoder` — do not introduce Node-only APIs there. Sessions are stateless: an expiry signed with HMAC-SHA256 in an httpOnly cookie.
 - **`better-sqlite3` is a native module**: it's in `serverExternalPackages` (not bundled) and `onlyBuiltDependencies` (pnpm builds it; `sharp` is disabled). Storage is hand-written SQL via better-sqlite3. `db.ts` idempotently migrates legacy slots into `accounts`; legacy `provider` columns in credential/snapshot/history/alert tables now store account IDs. `codex2` snapshots normalize to provider `codex` when read, without rewriting history or ciphertext. Keep these storage keys separate from `UsageSnapshot.provider` and the upstream ChatGPT Account ID credential field.
-- **SSRF protection is two layers**: `core/src/net.ts` does synchronous literal checks (https-only, no userinfo, reject private/loopback/link-local/CGNAT/cloud-metadata IPs); `apps/web/lib/ssrf.ts` adds DNS resolution. Known limitation: the literal-only check at fetch time leaves a TOCTOU / DNS-rebinding gap (validation isn't pinned to the connecting IP).
+- **SSRF protection is two layers**: `core/src/net.ts` does synchronous literal checks (https-only, no userinfo, reject private/loopback/link-local/CGNAT/cloud-metadata IPs); `apps/web/server/security/ssrf.ts` adds DNS resolution. Known limitation: the literal-only check at fetch time leaves a TOCTOU / DNS-rebinding gap (validation isn't pinned to the connecting IP).
 - **Auth is fail-closed**: if `DASHBOARD_PASSWORD` is unset, `middleware.ts` blocks everything. `AUTH_DISABLED=true` is local-dev only.
-- **Credentials are AES-256-GCM encrypted (`lib/crypto.ts`) and never returned to the frontend.** `APP_ENC_KEY` is the master key.
+- **Credentials are AES-256-GCM encrypted (`server/security/crypto.ts`) and never returned to the frontend.** `APP_ENC_KEY` is the master key.
 - **Comment language**: code comments are English-only and kept minimal (explain _why_, not _what_). Note that user-facing UI text (in `.tsx`) is intentionally Chinese, and some thrown error-message strings are Chinese — these are product content, not comments; do not "translate" string literals when editing comments.
 
 ## Environment variables
 
-Defined and validated in `apps/web/lib/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60), `ENABLE_POLLER`, `FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET` / `NOTIFY_MIN_USED_PERCENT`. Alert settings: `NOTIFY_ALERTS_ENABLED`, `NOTIFY_USAGE_THRESHOLDS` (80,95), `NOTIFY_BALANCE_THRESHOLDS` (opt-in per-provider JSON map), `NOTIFY_FAILURE_THRESHOLD` (3), `NOTIFY_COOLDOWN_SECONDS` (21600), `NOTIFY_STALE_SECONDS` (1800, minimum three poll intervals), `NOTIFY_RECOVERY`, and optional `DASHBOARD_URL`. An unset webhook disables all notifications.
+Defined and validated in `apps/web/runtime/env.ts`; documented in `apps/web/.env.example`. Required: `APP_ENC_KEY`; `DASHBOARD_PASSWORD` (required for any public deployment). Optional: `AUTH_SECRET` (falls back to `APP_ENC_KEY`), `AUTH_DISABLED`, `DATABASE_PATH`, `POLL_INTERVAL_SECONDS` (default 300, floor 60), `ENABLE_POLLER`, `FEISHU_WEBHOOK_URL` / `FEISHU_WEBHOOK_SECRET` / `NOTIFY_MIN_USED_PERCENT`. Alert settings: `NOTIFY_ALERTS_ENABLED`, `NOTIFY_USAGE_THRESHOLDS` (80,95), `NOTIFY_BALANCE_THRESHOLDS` (opt-in per-provider JSON map), `NOTIFY_FAILURE_THRESHOLD` (3), `NOTIFY_COOLDOWN_SECONDS` (21600), `NOTIFY_STALE_SECONDS` (1800, minimum three poll intervals), `NOTIFY_RECOVERY`, and optional `DASHBOARD_URL`. An unset webhook disables all notifications.
 
 ## Deployment
 

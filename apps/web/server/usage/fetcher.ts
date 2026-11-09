@@ -1,13 +1,8 @@
-import type { HttpClient, HttpResponse, UsageProvider, UsageSnapshot } from "@quota/core";
+import type { HttpClient, HttpResponse, UsageProvider } from "@quota/core";
 import { createUsageFetcher, nodeHttpClient } from "@quota/core";
-import { ENV } from "./env";
-import { detectAndNotifyAlerts, detectAndNotifyResets } from "./notify";
-import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "./store";
-
-export interface FetchResult {
-  snapshot: UsageSnapshot | null;
-  error: string | null;
-}
+import { ENV } from "@/runtime/env";
+import { detectAndNotifyAlerts, detectAndNotifyResets } from "@/server/notify";
+import { getCredential, listCredentials, saveSnapshot, updateCredentialSecret } from "@/server/storage";
 
 function debugHttpClient(provider: UsageProvider): HttpClient {
   if (!ENV.debug) return nodeHttpClient;

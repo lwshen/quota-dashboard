@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { ENV } from "./env";
+import { ENV } from "@/runtime/env";
 
 let _db: Database.Database | null = null;
 
@@ -27,12 +27,12 @@ export function db(): Database.Database {
       provider   TEXT PRIMARY KEY,
       enabled    INTEGER NOT NULL DEFAULT 1,
       mode       TEXT NOT NULL DEFAULT 'auto',
-      data       TEXT NOT NULL,            -- 加密后的 JSON(ProviderCredentials)
+      data       TEXT NOT NULL,            -- Encrypted JSON(ProviderCredentials)
       updated_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS snapshots (
       provider   TEXT PRIMARY KEY,
-      snapshot   TEXT,                     -- JSON(UsageSnapshot) 或 NULL
+      snapshot   TEXT,                     -- JSON(UsageSnapshot) or NULL
       error      TEXT,
       fetched_at TEXT NOT NULL
     );
