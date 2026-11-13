@@ -17,7 +17,7 @@ export function CredentialJsonImport({ provider, busy, onBusyChange, onImported 
   const path = provider === "claude"
     ? "~/.claude/.credentials.json"
     : provider === "antigravity"
-      ? "~/.codexbar/antigravity/oauth_creds.json 或 ~/.gemini/antigravity-cli/antigravity-oauth-token"
+      ? "~/.gemini/antigravity-cli/antigravity-oauth-token 或 OAuth 凭据 JSON"
       : "~/.codex/auth.json";
   const placeholder = provider === "claude"
     ? '{"claudeAiOauth":{"accessToken":"…","refreshToken":"…"}}'

@@ -46,7 +46,11 @@ function parseAntigravityJson(root: Record<string, unknown>): Record<string, str
   const projectId = readText(root, ["project_id", "projectId"]);
   const idToken = readText(root, ["id_token", "idToken"])
     || (tokens !== root ? readText(tokens, ["id_token", "idToken"]) : "");
-  const email = readText(root, ["email"]) || extractAntigravityJwtClaims(idToken).email || "";
+  const claims = extractAntigravityJwtClaims(idToken);
+  const email = readText(root, ["email", "extra.email"]) || claims.email || "";
+  const hostedDomain = readText(root, ["hosted_domain", "hostedDomain", "hd", "extra.hostedDomain"])
+    || claims.hostedDomain
+    || "";
   const expiresAt = readExpiry(tokens, ["expiry_date", "expiryDate", "expiresAt", "expires_at", "expiry"])
     || (tokens !== root ? readExpiry(root, ["expiry_date", "expiryDate", "expiresAt", "expires_at", "expiry"]) : "");
 
@@ -57,6 +61,7 @@ function parseAntigravityJson(root: Record<string, unknown>): Record<string, str
     ...(clientId ? { "extra.clientId": clientId } : {}),
     ...(projectId ? { "extra.projectId": projectId } : {}),
     ...(email ? { "extra.email": email } : {}),
+    ...(hostedDomain ? { "extra.hostedDomain": hostedDomain } : {}),
     ...(expiresAt ? { expiresAt } : {}),
   };
 }

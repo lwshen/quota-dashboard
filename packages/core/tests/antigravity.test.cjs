@@ -173,7 +173,7 @@ test("Antigravity falls back to fetchAvailableModels, canonicalizes retired Flas
     "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels": {
       models: {
         "gemini-2.5-pro": { displayName: "Gemini 2.5 Pro", quotaInfo: { remainingFraction: 0.65, resetTime: reset5h } },
-        "gemini-3.6-flash": { displayName: "Gemini 3.6 Flash", quotaInfo: { remainingFraction: 0.4, resetTime: reset5h } },
+        "gemini-3.6-flash": { displayName: "Gemini 3.6 Flash", quotaInfo: { remainingFraction: 0.3, resetTime: reset7d } },
         "gemini-3.5-flash": { displayName: "Gemini 3.5 Flash", quotaInfo: { remainingFraction: 0.8, resetTime: reset5h } },
         "gemini-2.5-flash-lite": { displayName: "Gemini 2.5 Flash Lite", quotaInfo: { remainingFraction: 0.1, resetTime: reset5h } },
         "claude-3-5-sonnet-thinking": { quotaInfo: { remainingFraction: 0.3, resetTime: reset7d } },
@@ -196,7 +196,7 @@ test("Antigravity falls back to fetchAvailableModels, canonicalizes retired Flas
   assert.deepEqual(
     snapshot.extraRateWindows.map((w) => [w.id, w.title, Math.round(w.window.usedPercent)]),
     [
-      ["gemini-3-7-flash", "Gemini 3.7 Flash", 60],
+      ["gemini-3-7-flash", "Gemini 3.7 Flash", 70],
       ["claude-3-7-opus", "Claude 3.7 Opus", 10],
     ],
   );
@@ -217,6 +217,7 @@ test("Antigravity verifies suspicious all-100% fetchAvailableModels responses wi
       "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels": {
         models: {
           "gemini-2.5-pro": { displayName: "Gemini 2.5 Pro", quotaInfo: { remainingFraction: 1, resetTime: reset5h } },
+          "claude-3-5-sonnet": { displayName: "Claude 3.5 Sonnet", quotaInfo: { remainingFraction: 1, resetTime: reset7d } },
         },
       },
       "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota": verifyResponse,
@@ -229,6 +230,8 @@ test("Antigravity verifies suspicious all-100% fetchAvailableModels responses wi
       { now, http },
     );
     assert.equal(snapshot.primary ? Math.round(snapshot.primary.usedPercent) : null, expectedPrimary);
+    assert.equal(snapshot.secondary, null);
+    assert.equal(snapshot.extraRateWindows, null);
     assert.equal(snapshot.identity.loginMethod, "Plan: Paid");
   }
 });

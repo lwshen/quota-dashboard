@@ -33,8 +33,8 @@ test("Claude imports only the selected OAuth fields from full files and flat obj
   }
 });
 
-test("Antigravity imports CodexBar oauth_creds.json, agy CLI token files, and extracts email from id_token", () => {
-  const idToken = `${Buffer.from('{"alg":"RS256"}').toString("base64url")}.${Buffer.from('{"email":"agy@example.com"}').toString("base64url")}.sig`;
+test("Antigravity imports OAuth credential JSON, agy CLI token files, and extracts email and hostedDomain from id_token", () => {
+  const idToken = `${Buffer.from('{"alg":"RS256"}').toString("base64url")}.${Buffer.from('{"email":"agy@example.com","hd":"corp.example.com"}').toString("base64url")}.sig`;
   assert.deepEqual(
     parseCredentialJson("antigravity", JSON.stringify({
       access_token: " ya29.access ",
@@ -53,6 +53,7 @@ test("Antigravity imports CodexBar oauth_creds.json, agy CLI token files, and ex
       "extra.clientSecret": "GOCSPX-secret",
       "extra.projectId": "proj-123",
       "extra.email": "agy@example.com",
+      "extra.hostedDomain": "corp.example.com",
       expiresAt: "2026-10-30T12:00:00.000Z",
     },
   );
@@ -70,6 +71,7 @@ test("Antigravity imports CodexBar oauth_creds.json, agy CLI token files, and ex
       bearerToken: "ya29.cli",
       refreshToken: "1//cli",
       "extra.email": "agy@example.com",
+      "extra.hostedDomain": "corp.example.com",
       expiresAt: "2026-10-30T12:00:00.000Z",
     },
   );

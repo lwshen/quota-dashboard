@@ -343,6 +343,7 @@ function parseRetrieveUserQuota(text: string): ModelQuotaEntry[] {
 function mergeVerifiedQuotas(models: ModelQuotaEntry[], verified: ModelQuotaEntry[]): ModelQuotaEntry[] {
   const verifiedById = new Map<string, ModelQuotaEntry>();
   for (const entry of verified) {
+    if (entry.remainingFraction == null) continue;
     const key = entry.modelId.toLowerCase();
     const existing = verifiedById.get(key);
     if (!existing || compareRestrictiveness(entry, existing) < 0) {
@@ -353,13 +354,14 @@ function mergeVerifiedQuotas(models: ModelQuotaEntry[], verified: ModelQuotaEntr
   const seen = new Set<string>();
   for (const model of models) {
     const key = model.modelId.toLowerCase();
-    seen.add(key);
     const match = verifiedById.get(key);
-    merged.push(match ? {
+    if (!match) continue;
+    seen.add(key);
+    merged.push({
       ...model,
       remainingFraction: match.remainingFraction,
       resetsAt: match.resetsAt ?? model.resetsAt,
-    } : model);
+    });
   }
   for (const [key, entry] of verifiedById) {
     if (!seen.has(key)) merged.push(entry);
@@ -399,6 +401,13 @@ function toRateWindow(entry: ModelQuotaEntry): RateWindow {
     resetDescription: entry.resetDescription,
     ...(usageKnown ? {} : { usageKnown: false }),
   };
+}
+
+function matchesPoolRepresentative(entry: ModelQuotaEntry, rep: ModelQuotaEntry | null): boolean {
+  if (!rep) return false;
+  const entryPct = entry.remainingFraction != null ? Math.round(entry.remainingFraction * 100) : -1;
+  const repPct = rep.remainingFraction != null ? Math.round(rep.remainingFraction * 100) : -1;
+  return entryPct === repPct && (entry.resetsAt ?? "") === (rep.resetsAt ?? "");
 }
 
 function buildModelWindows(rawQuotas: ModelQuotaEntry[]): {
@@ -443,21 +452,16 @@ function buildModelWindows(rawQuotas: ModelQuotaEntry[]): {
     });
   }
 
-  const coveredKeys = new Set<string>();
-  for (const rep of [geminiRep, claudeGptRep]) {
-    if (!rep) continue;
-    const pct = rep.remainingFraction != null ? Math.round(rep.remainingFraction * 100) : -1;
-    coveredKeys.add(`${pct}:${rep.resetsAt ?? ""}`);
-  }
   const seenIds = new Set<string>(extra.map((w) => w.id));
   for (const entry of quotas) {
     if (isExcludedFromSummaryPool(entry)) continue;
-    const pct = entry.remainingFraction != null ? Math.round(entry.remainingFraction * 100) : -1;
-    const key = `${pct}:${entry.resetsAt ?? ""}`;
     const family = classifyModelFamily(entry);
-    if ((family === "geminiPro" || family === "geminiFlash" || family === "claudeModels" || family === "gpt") && coveredKeys.has(key)) {
-      continue;
-    }
+    const poolRep = family === "geminiPro" || family === "geminiFlash"
+      ? geminiRep
+      : family === "claudeModels" || family === "gpt"
+        ? claudeGptRep
+        : null;
+    if (matchesPoolRepresentative(entry, poolRep)) continue;
     const id = slug(entry.label) || slug(entry.modelId);
     if (!id || seenIds.has(id)) continue;
     seenIds.add(id);
@@ -663,7 +667,7 @@ const CREDENTIAL_FIELDS: CredentialField[] = [
     required: true,
     secret: true,
     placeholder: "ya29....",
-    help: "可从 ~/.codexbar/antigravity/oauth_creds.json 导入，或填写 access_token",
+    help: "可从 ~/.gemini/antigravity-cli/antigravity-oauth-token 或 OAuth 凭据 JSON 导入，或填写 access_token",
   },
   {
     key: "refreshToken",
@@ -704,6 +708,14 @@ const CREDENTIAL_FIELDS: CredentialField[] = [
     secret: false,
     placeholder: "user@example.com",
     help: "从 JSON 导入或刷新 id_token 时自动提取",
+  },
+  {
+    key: "extra.hostedDomain",
+    label: "Workspace 域名（可选）",
+    required: false,
+    secret: false,
+    placeholder: "example.com",
+    help: "对应 id_token 中的 hd，从 JSON 导入或刷新时自动提取",
   },
   {
     key: "expiresAt",
