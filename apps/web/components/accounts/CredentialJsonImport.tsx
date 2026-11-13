@@ -14,7 +14,16 @@ export function CredentialJsonImport({ provider, busy, onBusyChange, onImported 
   const [error, setError] = useState<string | null>(null);
   const reading = useRef(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const path = provider === "claude" ? "~/.claude/.credentials.json" : "~/.codex/auth.json";
+  const path = provider === "claude"
+    ? "~/.claude/.credentials.json"
+    : provider === "antigravity"
+      ? "~/.codexbar/antigravity/oauth_creds.json 或 ~/.gemini/antigravity-cli/antigravity-oauth-token"
+      : "~/.codex/auth.json";
+  const placeholder = provider === "claude"
+    ? '{"claudeAiOauth":{"accessToken":"…","refreshToken":"…"}}'
+    : provider === "antigravity"
+      ? '{"access_token":"…","refresh_token":"…","client_id":"…","client_secret":"…"}'
+      : '{"tokens":{"access_token":"…","refresh_token":"…","account_id":"…"}}';
   const id = `${provider}-json-import`;
 
   function apply(source: string) {
@@ -51,7 +60,7 @@ export function CredentialJsonImport({ provider, busy, onBusyChange, onImported 
       <label className="flabel" htmlFor={`${id}-text`}>JSON 字符串</label>
       <textarea ref={textarea} id={`${id}-text`} className="field credential-json-source" rows={5} value={source}
         disabled={busy} autoComplete="off" spellCheck={false} autoCapitalize="off"
-        placeholder={provider === "claude" ? '{"claudeAiOauth":{"accessToken":"…","refreshToken":"…"}}' : '{"tokens":{"access_token":"…","refresh_token":"…","account_id":"…"}}'}
+        placeholder={placeholder}
         aria-invalid={!!error} aria-describedby={`${id}-help${error ? ` ${id}-error` : ""}`}
         onChange={(event) => { setSource(event.target.value); setError(null); }} />
       <button type="button" className="management-action" disabled={busy || !source.trim()} onClick={() => {

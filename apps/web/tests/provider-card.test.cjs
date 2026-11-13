@@ -28,6 +28,8 @@ test("card shows actual Kimi duration and trusts each window independently", asy
   assert.match(html, /20%/);
   assert.equal((html.match(/class="bar"/g) ?? []).length, 1);
   assert.equal(laneMeta("kimi", "secondary", null).title, "速率");
+  assert.deepEqual(laneMeta("antigravity", "primary"), { title: "Gemini 模型", sub: "Gemini" });
+  assert.deepEqual(laneMeta("antigravity", "secondary"), { title: "Claude / GPT", sub: "Claude/GPT" });
 });
 
 test("card renders ratio-only Kimi monthly quota and every inactive Claude model quota", async () => {
