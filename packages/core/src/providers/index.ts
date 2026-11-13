@@ -1,3 +1,4 @@
+export { antigravityDescriptor, ANTIGRAVITY_DEFAULT_CLIENT_ID, extractAntigravityJwtClaims, parseAntigravityQuotaSummary } from "./antigravity";
 export { kimiDescriptor } from "./kimi";
 export { moonshotDescriptor } from "./moonshot";
 export { claudeDescriptor } from "./claude";

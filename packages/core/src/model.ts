@@ -1,4 +1,4 @@
-export type UsageProvider = "claude" | "codex" | "codex2" | "grok" | "kimi" | "moonshot" | "rightapi";
+export type UsageProvider = "antigravity" | "claude" | "codex" | "codex2" | "grok" | "kimi" | "moonshot" | "rightapi";
 
 export type UsageDataConfidence = "exact" | "estimated" | "percentOnly" | "unknown";
 

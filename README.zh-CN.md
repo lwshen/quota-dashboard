@@ -26,7 +26,7 @@ api.anthropic.com · chatgpt.com/backend-api · api.kimi.com · ...
 ```
 quota-dashboard/
 ├─ packages/core/          # 统一模型、服务商适配、OAuth 与 HTTP（不依赖框架）
-│  ├─ src/providers/       # kimi / moonshot / claude / codex / grok / rightapi
+│  ├─ src/providers/       # antigravity / kimi / moonshot / claude / codex / grok / rightapi
 │  └─ tests/               # 离线协议与采集测试
 ├─ apps/web/
 │  ├─ app/                 # 页面和 API 路由
@@ -44,14 +44,15 @@ quota-dashboard/
 
 ## 已实现的 provider
 
-| Provider     | 路径                                               | 凭据                                 | 产出                                          |
-| ------------ | -------------------------------------------------- | ------------------------------------ | --------------------------------------------- |
-| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                           | 周/会话配额 + 月总量，兼容比例与旧计数格式    |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | 余额（无窗口）                                |
-| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/全部模型/routines 窗口 + extra 花费     |
-| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d/Spark 窗口 + Credits 余额与工作区月额度 |
-| **Grok**     | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                | 额度用量、重置时间、产品明细、套餐及预付余额  |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | 余额（无窗口）                                |
+| Provider        | 路径                                               | 凭据                                   | 产出                                              |
+| --------------- | -------------------------------------------------- | -------------------------------------- | ------------------------------------------------- |
+| **Kimi**        | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                             | 周/会话配额 + 月总量，兼容比例与旧计数格式        |
+| **Moonshot**    | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                             | 余额（无窗口）                                    |
+| **Claude**      | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)                | 5h/7d/全部模型/routines 窗口 + extra 花费         |
+| **Codex**       | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh)   | 5h/7d/Spark 窗口 + Credits 余额与工作区月额度     |
+| **Antigravity** | Google Cloud Code (`cloudcode-pa.googleapis.com`)  | Google OAuth token (+refresh + secret) | Gemini 与 Claude/GPT 5h/周配额窗口 + 模型配额回退 |
+| **Grok**        | CLI billing proxy，Bearer gRPC-web 作为后备        | Grok CLI access token                  | 额度用量、重置时间、产品明细、套餐及预付余额      |
+| **RightAPI**    | account (`www.rightapi.ai/auth/me`)                | user token                             | 余额（无窗口）                                    |
 
 凭据获取方式见各 `providers/*.ts` 顶部注释。在账号配置中，Claude 和所有 Codex 账号均支持选择 JSON 文件或粘贴 JSON 字符串，可使用本机 `~/.claude/.credentials.json`、`~/.codex/auth.json` 的完整内容、其中的 `claudeAiOauth` / `tokens` 对象，或扁平的 Token 对象。导入后会填入表单供检查，包含可用的 Refresh Token 和 Codex Account ID，检查后再保存。JSON 在浏览器内解析（最大 1 MB），保存时仅提交支持的凭据字段，也可继续手动填写。
 

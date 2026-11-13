@@ -161,7 +161,7 @@ export function AddCredentialForm({ provider, accountId, credential, onBusyChang
         {credential?.fetchError && <p className="credential-error">上次获取失败：{credential.fetchError}</p>}
         {!provider.enabled && <p className="management-help">停用期间仅保存凭据，不会获取用量。启用后才会恢复显示和刷新。</p>}
       </section>
-      {(provider.provider === "codex" || provider.provider === "codex2" || provider.provider === "claude") &&
+      {(provider.provider === "codex" || provider.provider === "codex2" || provider.provider === "claude" || provider.provider === "antigravity") &&
         <CredentialJsonImport provider={provider.provider} busy={busy} onBusyChange={setWorking}
           onImported={applyImport} />}
       {provider.provider === "grok" && <section className="credential-import">

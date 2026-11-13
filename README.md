@@ -26,7 +26,7 @@ api.anthropic.com · chatgpt.com/backend-api · api.kimi.com · ...
 ```
 quota-dashboard/
 ├─ packages/core/          # Framework-free models, providers, OAuth and HTTP
-│  ├─ src/providers/       # kimi / moonshot / claude / codex / grok / rightapi
+│  ├─ src/providers/       # antigravity / kimi / moonshot / claude / codex / grok / rightapi
 │  └─ tests/               # Offline protocol and fetch tests
 ├─ apps/web/
 │  ├─ app/                 # Pages and API routes
@@ -44,14 +44,15 @@ See the [architecture and maintenance guide (Chinese)](./docs/architecture.zh-CN
 
 ## Implemented providers
 
-| Provider     | Path                                               | Credentials                          | Output                                                               |
-| ------------ | -------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
-| **Kimi**     | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                           | Weekly/session quotas + monthly total; ratio pools and legacy counts |
-| **Moonshot** | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                           | Balance (no window)                                                  |
-| **Claude**   | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)              | 5h/7d/all model-scoped/routines windows + extra spend                |
-| **Codex**    | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh) | 5h/7d + Spark windows; Credits balance and workspace monthly cap     |
-| **Grok**     | CLI billing proxy, with bearer gRPC-web fallback   | Grok CLI access token                | Credit usage + reset time, product breakdown, plan, prepaid balance  |
-| **RightAPI** | account (`www.rightapi.ai/auth/me`)                | user token                           | Balance (no window)                                                  |
+| Provider        | Path                                               | Credentials                            | Output                                                               |
+| --------------- | -------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------- |
+| **Kimi**        | Code API (`api.kimi.com/coding/v1/usages`)         | Bearer key                             | Weekly/session quotas + monthly total; ratio pools and legacy counts |
+| **Moonshot**    | balance (`api.moonshot.ai\|.cn`)                   | Bearer key                             | Balance (no window)                                                  |
+| **Claude**      | OAuth usage (`api.anthropic.com/api/oauth/usage`)  | access token (+refresh)                | 5h/7d/all model-scoped/routines windows + extra spend                |
+| **Codex**       | OAuth usage (`chatgpt.com/backend-api/wham/usage`) | access token + account id (+refresh)   | 5h/7d + Spark windows; Credits balance and workspace monthly cap     |
+| **Antigravity** | Google Cloud Code (`cloudcode-pa.googleapis.com`)  | Google OAuth token (+refresh + secret) | Gemini & Claude/GPT 5h/weekly summary windows + model quota fallback |
+| **Grok**        | CLI billing proxy, with bearer gRPC-web fallback   | Grok CLI access token                  | Credit usage + reset time, product breakdown, plan, prepaid balance  |
+| **RightAPI**    | account (`www.rightapi.ai/auth/me`)                | user token                             | Balance (no window)                                                  |
 
 See the comment at the top of each `providers/*.ts` for how to obtain credentials. In account settings, Claude and all Codex accounts support importing a JSON file or pasting a JSON string from `~/.claude/.credentials.json` or `~/.codex/auth.json`. Full credential files, their `claudeAiOauth` / `tokens` objects, and flat token objects are supported. Imports fill the form for review before saving, including refresh tokens and Codex account IDs when present. Parsing happens in the browser (1 MB maximum); only supported credential fields are submitted when you save. Manual entry remains available.
 
